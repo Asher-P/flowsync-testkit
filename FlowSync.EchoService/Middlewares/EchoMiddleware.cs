@@ -1,3 +1,4 @@
+using System.Text;
 using KafkaFlow;
 using KafkaFlow.Producers;
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,10 @@ public class EchoMiddleware : IMessageMiddleware
         foreach (var header in context.Headers)
             headers.Add(header.Key, header.Value);
 
-        var key = context.Message.Key?.ToString();
+        var key = context.Message.Key is byte[] keyBytes
+            ? Encoding.UTF8.GetString(keyBytes)
+            : context.Message.Key?.ToString();
+
         await producer.ProduceAsync("B", key, context.Message.Value, headers);
 
         _logger.LogInformation("Echoed message from A to B. Key: {Key}", key);
