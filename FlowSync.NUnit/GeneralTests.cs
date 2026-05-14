@@ -11,7 +11,6 @@ using FlowSync.NUnit.Factories;
 using FlowSync.Tests.Models;
 using FlowSync.Orchestration.Configurations;
 using FlowSync.Orchestration.Factories;
-using FlowSync.Orchestration.Host;
 using FlowSync.Orchestration.Entities.Interfaces;
 using KafkaFlow;
 using Microsoft.Extensions.Configuration;
@@ -37,8 +36,6 @@ public class GeneralTests
             .AddPlaceholderResolver()
             .Build();
 
-        services.AddFlowSyncService();
-        services.AddSingleton<AnimalTraitFactory>();
         services.AddLogging(loggingBuilder => { loggingBuilder.AddConsole(); });
         services.AddSingleton<IConfiguration>(x => Configuration);
 
@@ -56,14 +53,14 @@ public class GeneralTests
                     consumerBuilder.AddTopic(OutliersConsts.CONSUMER_TOPIC)
                         .AddConsumerGroup(OutliersConsts.CONSUMER_GROUP)
                         .AddConsumingSerializer(new KafkaUTF8Serializer())
-                        .AddConsumingType(typeof(OutlierTrait))
+                        .AddConsumingType(typeof(Animal))
                         .SetWorkersCount(55)
                         .SetBufferSize(50);
                 })
                 .AddProducer(producerBuilder =>
                 {
                     producerBuilder.AddProducerTopic(OutliersConsts.PRODUCER_OUTLIER)
-                        .AddProducerSerializer(new KafkaProtobufSerializer());
+                        .AddProducerSerializer(new KafkaUTF8Serializer());
                 });
         });
         _provider = services.BuildServiceProvider();
@@ -74,8 +71,8 @@ public class GeneralTests
     {
         try
         {
-            var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
+            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
             {
                 ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
                 ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -86,20 +83,8 @@ public class GeneralTests
                 }
             });
 
-            var animalTraitFactory = _provider.GetRequiredService<AnimalTraitFactory>();
-
-            var animal = await AnimalFactory.CreateActiveAnimal();
-            var animalTrait = animalTraitFactory.GetBaseAnimalTrait(animal.Id);
-            animal.LastUpdate = DateTime.UtcNow;
-            var distribution = new AnimalTraitsDistribution
-            {
-                Animal = animal,
-                ProviderId = animalTrait.ProviderId,
-                TraitsToDistribute = new List<AnimalTrait> { animalTrait }
-            };
-
-            var waitForMessagesTask = await FlowSyncService.ExecuteAsync(
-                $"{animalTrait.AnimalId}_{animalTrait.TraitId}", distribution);
+            var animal = AnimalFactory.Create();
+            var waitForMessagesTask = await flowSyncStep.ExecuteAsync($"{animal.Id}", animal);
             await Task.Delay(1000);
 
             var messages = await waitForMessagesTask.Task;
@@ -117,8 +102,8 @@ public class GeneralTests
     {
         try
         {
-            var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
+            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
             {
                 ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
                 ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -129,20 +114,9 @@ public class GeneralTests
                 }
             });
 
-            var animalTraitFactory = _provider.GetRequiredService<AnimalTraitFactory>();
-
-            var animal = await AnimalFactory.CreateActiveAnimal();
-            var animalTrait = animalTraitFactory.GetBaseAnimalTrait(animal.Id);
-            animal.LastUpdate = DateTime.UtcNow;
-            var distribution = new AnimalTraitsDistribution
-            {
-                Animal = animal,
-                ProviderId = animalTrait.ProviderId,
-                TraitsToDistribute = new List<AnimalTrait> { animalTrait }
-            };
-
-            var waitForMessagesTask = await FlowSyncService.ExecuteAsync(
-                $"{animalTrait.AnimalId}_{animalTrait.TraitId}", distribution,
+            var animal = AnimalFactory.Create("Buddy");
+            var waitForMessagesTask = await flowSyncStep.ExecuteAsync(
+                $"{animal.Id}", animal,
                 new FlowSync.Core.Messaging.Publishing.Entities.ProducingExtraData
                 {
                     Headers = new Dictionary<string, string> { { "test", "test" } }

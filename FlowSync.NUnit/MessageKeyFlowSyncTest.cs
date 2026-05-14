@@ -10,7 +10,6 @@ using FlowSync.NUnit.Factories;
 using FlowSync.Tests.Models;
 using FlowSync.Orchestration.Configurations;
 using FlowSync.Orchestration.Factories;
-using FlowSync.Orchestration.Host;
 using FlowSync.Orchestration.Entities.Interfaces;
 using KafkaFlow;
 using Microsoft.Extensions.Configuration;
@@ -36,8 +35,6 @@ public class MessageKeyFlowSyncTest
             .AddPlaceholderResolver()
             .Build();
 
-        services.AddFlowSyncService();
-        services.AddSingleton<AnimalTraitFactory>();
         services.AddLogging(loggingBuilder => { loggingBuilder.AddConsole(); });
         services.AddSingleton<IConfiguration>(x => Configuration);
 
@@ -55,14 +52,14 @@ public class MessageKeyFlowSyncTest
                     consumerBuilder.AddTopic(OutliersConsts.CONSUMER_TOPIC)
                         .AddConsumerGroup(OutliersConsts.CONSUMER_GROUP)
                         .AddConsumingSerializer(new KafkaUTF8Serializer())
-                        .AddConsumingType(typeof(OutlierTrait))
+                        .AddConsumingType(typeof(Animal))
                         .SetWorkersCount(55)
                         .SetBufferSize(50);
                 })
                 .AddProducer(producerBuilder =>
                 {
                     producerBuilder.AddProducerTopic(OutliersConsts.PRODUCER_OUTLIER)
-                        .AddProducerSerializer(new KafkaProtobufSerializer());
+                        .AddProducerSerializer(new KafkaUTF8Serializer());
                 });
         });
         _provider = services.BuildServiceProvider();
@@ -73,14 +70,10 @@ public class MessageKeyFlowSyncTest
     {
         try
         {
-            var animalTraitFactory = _provider.GetRequiredService<AnimalTraitFactory>();
+            var animal = AnimalFactory.Create("Luna");
 
-            var animal = await AnimalFactory.CreateActiveAnimal();
-            var animalTrait = animalTraitFactory.GetBaseAnimalTrait(animal.Id);
-            animal.LastUpdate = DateTime.UtcNow;
-
-            var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
+            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
             {
                 ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
                 ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -88,24 +81,14 @@ public class MessageKeyFlowSyncTest
                 {
                     TimeOut = TimeSpan.FromSeconds(30),
                     MsgReceivedCount = 1,
-                    ExpectedMessageKey = $"Outliers:InPlay:{animal.Id}:{animalTrait.TraitId}"
+                    ExpectedMessageKey = $"{animal.Id}"
                 }
             });
 
-            var distribution = new AnimalTraitsDistribution
-            {
-                Animal = animal,
-                ProviderId = animalTrait.ProviderId,
-                TraitsToDistribute = new List<AnimalTrait> { animalTrait }
-            };
-
-            var waitForMessagesTask = await FlowSyncService.ExecuteAsync(
-                $"{animalTrait.AnimalId}_{animalTrait.TraitId}", distribution);
-
+            var waitForMessagesTask = await flowSyncStep.ExecuteAsync($"{animal.Id}", animal);
             await Task.Delay(1000);
 
             var messages = await waitForMessagesTask.Task;
-
             Console.WriteLine($"Received {messages.Count()} message containers");
             Console.WriteLine(JsonSerializer.Serialize(messages));
         }
@@ -122,8 +105,8 @@ public class MessageKeyFlowSyncTest
     {
         try
         {
-            var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
+            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
             {
                 ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
                 ConsumingOptions = new ConsumingOptionsConfiguration()
@@ -134,7 +117,7 @@ public class MessageKeyFlowSyncTest
                 }
             });
 
-            await FlowSyncService.ExecuteAsync<string>("", "");
+            await flowSyncStep.ExecuteAsync<string>("", "");
             await Task.Delay(1000);
 
             Console.WriteLine("FlowSync set up to consume only messages with key: specific-consume-key");
@@ -155,13 +138,10 @@ public class MessageKeyFlowSyncTest
     {
         try
         {
-            var animalTraitFactory = _provider.GetRequiredService<AnimalTraitFactory>();
-            var animal = await AnimalFactory.CreateActiveAnimal();
-            var animalTrait = animalTraitFactory.GetBaseAnimalTrait(animal.Id);
-            animal.LastUpdate = DateTime.UtcNow;
+            var animal = AnimalFactory.Create("Max");
 
-            var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
+            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
             {
                 ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
                 ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -172,16 +152,7 @@ public class MessageKeyFlowSyncTest
                 }
             });
 
-            var distribution = new AnimalTraitsDistribution
-            {
-                Animal = animal,
-                ProviderId = animalTrait.ProviderId,
-                TraitsToDistribute = new List<AnimalTrait> { animalTrait }
-            };
-
-            await FlowSyncService.ExecuteAsync(
-                $"{animalTrait.AnimalId}_{animalTrait.TraitId}", distribution);
-
+            await flowSyncStep.ExecuteAsync($"{animal.Id}", animal);
             await Task.Delay(1000);
             Console.WriteLine("Traditional correlation ID FlowSync test completed");
         }

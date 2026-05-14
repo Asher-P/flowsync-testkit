@@ -3,8 +3,6 @@ using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using SaslMechanism = Confluent.Kafka.SaslMechanism;
 using SecurityProtocol = Confluent.Kafka.SecurityProtocol;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Receivers;
 using FlowSync.Kafka.Extensions;
 using FlowSync.Kafka.Serializers;
 using FlowSync.Kafka.Configurations;
@@ -26,7 +24,6 @@ public class GeneralTests
 {
     private readonly ITestOutputHelper _testOutputHelper;
     public IConfigurationRoot Configuration { get; set; }
-
     private IServiceProvider _provider;
 
     public GeneralTests(ITestOutputHelper testOutputHelper)
@@ -42,10 +39,7 @@ public class GeneralTests
             .Build();
 
         services.AddSingleton<IConfiguration>(Configuration);
-        services.AddSingleton<AnimalTraitFactory>();
         services.AddLogging(loggingBuilder => { loggingBuilder.AddConsole(); });
-        services.AddSingleton<IFilterService, FilterService>();
-        services.AddSingleton<IMessagePool, MessagePool>();
         services.AddKafkaFlowSync(builder =>
         {
             var kafkaBrokerConfig = Configuration.GetSection("KafkaBrokerConfiguration").Get<KafkaBrokerConfiguration>();
@@ -60,7 +54,7 @@ public class GeneralTests
                     consumerBuilder.AddTopic(OutliersConsts.CONSUMER_TOPIC)
                         .AddConsumerGroup(OutliersConsts.CONSUMER_GROUP)
                         .AddConsumingSerializer(new KafkaUTF8Serializer())
-                        .AddConsumingType(typeof(OutlierTrait));
+                        .AddConsumingType(typeof(Animal));
                 })
                 .AddProducer(producerBuilder =>
                 {
@@ -76,8 +70,8 @@ public class GeneralTests
     {
         try
         {
-            var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
+            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
             {
                 ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
                 ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -88,24 +82,11 @@ public class GeneralTests
                 }
             });
 
-            var animalTraitFactory = _provider.GetRequiredService<AnimalTraitFactory>();
-
-            var animal = await AnimalFactory.CreateActiveAnimal();
-            var animalTrait = animalTraitFactory.GetBaseAnimalTrait(animal.Id);
-            animal.LastUpdate = DateTime.UtcNow;
-            var distribution = new AnimalTraitsDistribution
-            {
-                Animal = animal,
-                ProviderId = animalTrait.ProviderId,
-                TraitsToDistribute = new List<AnimalTrait> { animalTrait }
-            };
-
-            var waitForMessagesTask = await FlowSyncService.ExecuteAsync(
-                $"{animalTrait.AnimalId}_{animalTrait.TraitId}", distribution);
+            var animal = AnimalFactory.Create();
+            var waitForMessagesTask = await flowSyncStep.ExecuteAsync($"{animal.Id}", animal);
             await Task.Delay(1000);
 
             var messages = await waitForMessagesTask.Task;
-
             Console.WriteLine(JsonSerializer.Serialize(messages));
         }
         finally
