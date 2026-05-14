@@ -5,9 +5,14 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageIcon>icon.png</PackageIcon>
     </PropertyGroup>
 
 
+
+    <ItemGroup>
+      <None Include="..\icon.png" Pack="true" PackagePath="\" />
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="KafkaFlow" Version="4.0.0" />
