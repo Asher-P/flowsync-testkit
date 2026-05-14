@@ -1,4 +1,4 @@
-# Automation Playbook Framework - High Level Design (HLD)
+﻿# Automation Playbook Framework - High Level Design (HLD)
 
 ## 1. Executive Summary
 
@@ -13,9 +13,9 @@ graph TD
     subgraph "Test Environment"
         TR[Test Runner / Test Project]
         subgraph "Automation Playbook Framework"
-            Orch[FlowSync.Orchestration]
-            Core[FlowSync.Core]
-            KafkaLib[FlowSync.Kafka]
+            Orch[MessageHook.Orchestration]
+            Core[MessageHook.Core]
+            KafkaLib[MessageHook.Kafka]
         end
     end
 
@@ -39,12 +39,12 @@ graph TD
 
 The solution is divided into three main logical layers:
 
-### 3.1 FlowSync.Core (Abstractions)
+### 3.1 MessageHook.Core (Abstractions)
 The foundational layer defining interfaces and domain models.
 *   **Responsibilities**: Defines `IMessagePool`, `IFilterService`, and core Messaging interfaces.
 *   **Key Abstractions**: Interface definitions for Receivers, Publishers, and Filtering logic independent of the underlying transport (Kafka).
 
-### 3.2 FlowSync.Kafka (Implementation)
+### 3.2 MessageHook.Kafka (Implementation)
 The concrete implementation layer specifically for Apache Kafka.
 *   **Responsibilities**: Wraps `KafkaFlow` and `Confluent.Kafka` to provide easy-to-use builders and clients.
 *   **Key Features**:
@@ -52,18 +52,18 @@ The concrete implementation layer specifically for Apache Kafka.
     *   **Serializers**: Support for JSON (`KafkaUTF8Serializer`) and Protobuf (`KafkaProtobufSerializer`).
     *   **Middleware**: Custom error handling and message filtering middleware.
 
-### 3.3 FlowSync.Orchestration (Flow Control)
+### 3.3 MessageHook.Orchestration (Flow Control)
 The "brain" of the framework that manages the test lifecycle.
 *   **Responsibilities**: Synchronizes the asynchronous nature of messaging with the synchronous nature of tests.
 *   **Key Components**:
-    *   **`IFlowSyncFactory`**: Creates initialized `FlowSyncStep` instances.
-    *   **`FlowSyncStep`**: Represents a single test action (Produce -> Wait -> Consume).
+    *   **`IMessageHookFactory`**: Creates initialized `MessageHookStep` instances.
+    *   **`MessageHookStep`**: Represents a single test action (Produce -> Wait -> Consume).
     *   **`MessagePool`**: A thread-safe collection holding consumed messages until requested by the test.
 
 ## 4. Key Design Patterns
 
-*   **Builder Pattern**: Used extensively for configuration (e.g., `.AddKafkaFlowSync(builder => ...)`), allowing fluent and readable setup of complex Kafka topologies.
-*   **Factory Pattern**: `FlowSyncFactory` abstracting the creation of FlowSync steps, ensuring all dependencies (like `IMessagePool`) are correctly injected.
+*   **Builder Pattern**: Used extensively for configuration (e.g., `.AddKafkaMessageHook(builder => ...)`), allowing fluent and readable setup of complex Kafka topologies.
+*   **Factory Pattern**: `MessageHookFactory` abstracting the creation of MessageHook steps, ensuring all dependencies (like `IMessagePool`) are correctly injected.
 *   **Strategy Pattern**: Used for Serialization (switching between UTF8/Protobuf) and Correlation (switching between Auto-CorrelationId and ExpectedMessageKey).
 
 ## 5. Operational Workflows
@@ -74,7 +74,7 @@ Used when the test initiates the action by sending a command message.
 ```mermaid
 sequenceDiagram
     participant Test as Test Method
-    participant JS as FlowSyncStep
+    participant JS as MessageHookStep
     participant Kafka as Kafka
     participant SUT as System Under Test
 
@@ -98,9 +98,9 @@ sequenceDiagram
     participant Ext as Database/External
     participant SUT as System Under Test
     participant Kafka as Kafka
-    participant JS as FlowSyncStep
+    participant JS as MessageHookStep
 
-    Test->>JS: Create FlowSync (ExpectedMessageKey = "Fixture_123")
+    Test->>JS: Create MessageHook (ExpectedMessageKey = "Fixture_123")
     Test->>Ext: Trigger Action
     Ext->>SUT: Event
     SUT->>Kafka: Produce Event (Key = "Fixture_123")
@@ -114,7 +114,7 @@ sequenceDiagram
 
 The framework integrates natively with .NET Core `IConfiguration` and `IServiceCollection`.
 
-*   **Dependency Injection**: All components are registered via `services.AddKafkaFlowSync()`.
+*   **Dependency Injection**: All components are registered via `services.AddKafkaMessageHook()`.
 *   **Configuration Sources**: Supports `appsettings.json`, Environment Variables, and Placeholder resolution (Steeltoe) for secret management.
 *   **Consumer Groups**: Tests dynamically create and (crucially) **must clean up** consumer groups to ensure test isolation and repeatability.
 

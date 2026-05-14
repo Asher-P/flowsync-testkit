@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>MessageHook.Orchestration</PackageId>
+        <AssemblyName>MessageHook.Orchestration</AssemblyName>
+        <RootNamespace>MessageHook.Orchestration</RootNamespace>
+        <Authors>MessageHook Framework Team</Authors>
+        <Description>MessageHook orchestration and management framework for integration testing</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\MessageHook.Core\MessageHook.Core.csproj" />
+    </ItemGroup>
+
+
+</Project>

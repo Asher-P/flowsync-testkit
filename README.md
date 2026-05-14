@@ -1,4 +1,4 @@
-# flowsync
+﻿# messagehook
 
 Infrastructure for integration tests as a reusable NuGet package.
 
@@ -21,7 +21,7 @@ This package provides a robust infrastructure for integration and automation tes
 2. Install the package in your test project:
 
 ```sh
-dotnet add package FlowSync.Orchestration
+dotnet add package MessageHook.Orchestration
 ```
 
 ## Configuration
@@ -68,13 +68,13 @@ Here's a complete working example based on real test implementation:
 ```csharp
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Receivers;
-using FlowSync.Kafka.Extensions;
-using FlowSync.Kafka.Serializers;
-using FlowSync.Kafka.Configurations;
-using FlowSync.Orchestration.Configurations;
-using FlowSync.Orchestration.Factories;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Receivers;
+using MessageHook.Kafka.Extensions;
+using MessageHook.Kafka.Serializers;
+using MessageHook.Kafka.Configurations;
+using MessageHook.Orchestration.Configurations;
+using MessageHook.Orchestration.Factories;
 using KafkaFlow;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -115,12 +115,12 @@ public class GeneralTests
             loggingBuilder.AddConsole();
         });
 
-        // Register FlowSync services
+        // Register MessageHook services
         services.AddSingleton<IFilterService, FilterService>();
         services.AddSingleton<IMessagePool, MessagePool>();
 
-        // Configure Kafka FlowSync
-        services.AddKafkaFlowSync(builder =>
+        // Configure Kafka MessageHook
+        services.AddKafkaMessageHook(builder =>
         {
             // Get configuration from appsettings.json
             var kafkaBrokerConfig = Configuration.GetSection("KafkaBrokerConfiguration").Get<KafkaBrokerConfiguration>();
@@ -151,19 +151,19 @@ public class GeneralTests
 
 ## Complete Test Examples
 
-### 1. Producer-Driven Flow (Standard FlowSync)
+### 1. Producer-Driven Flow (Standard MessageHook)
 
 Here's a test where you produce a message and wait for the response:
 
 ```csharp
 [Fact]
-public async Task FlowSyncTest_ProducerDriven()
+public async Task MessageHookTest_ProducerDriven()
 {
     try
     {
-        // Setup FlowSync - NO ExpectedMessageKey needed (FlowSync creates correlationId)
-        var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-        var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+        // Setup MessageHook - NO ExpectedMessageKey needed (MessageHook creates correlationId)
+        var MessageHookFactory = _provider.GetRequiredService<IMessageHookFactory>();
+        var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration()
         {
             ProduceTo = "YOUR_PRODUCER_TOPIC",
             ConsumeFrom = new[] { "YOUR_CONSUMER_TOPIC" },
@@ -178,8 +178,8 @@ public async Task FlowSyncTest_ProducerDriven()
         // Create your test data
         var testMessage = CreateYourTestMessage();
 
-        // Send Message - FlowSync framework creates correlationId automatically
-        var waitForMessagesTask = await FlowSyncStep.ExecuteAsync(
+        // Send Message - MessageHook framework creates correlationId automatically
+        var waitForMessagesTask = await MessageHookStep.ExecuteAsync(
             "your-message-key", testMessage);
         
         // Allow processing time
@@ -206,16 +206,16 @@ Use this when you want to consume messages matched by their Kafka message key in
 
 ```csharp
 [Fact]
-public async Task FlowSyncTest_MessageKeyFlow()
+public async Task MessageHookTest_MessageKeyFlow()
 {
     try
     {
         var fixtureId = 12345;
         var marketId = 3338;
         
-        // Setup FlowSync - set ExpectedMessageKey to filter by Kafka message key
-        var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-        var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+        // Setup MessageHook - set ExpectedMessageKey to filter by Kafka message key
+        var MessageHookFactory = _provider.GetRequiredService<IMessageHookFactory>();
+        var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration()
         {
             // No ProduceTo - consuming only, matched by message key
             ConsumeFrom = new[] { "DI.PreMatch.Markets.Validated" },
@@ -231,7 +231,7 @@ public async Task FlowSyncTest_MessageKeyFlow()
         await TriggerDatabaseChange(fixtureId, marketId);
 
         // Wait for message matching the expected key - no parameters needed
-        var waitForMessagesTask = await FlowSyncStep.ExecuteAsync();
+        var waitForMessagesTask = await MessageHookStep.ExecuteAsync();
         
         // Allow processing time
         await Task.Delay(2000);
@@ -267,11 +267,11 @@ For scenarios expecting multiple messages matched by key:
 
 ```csharp
 [Fact]
-public async Task FlowSyncTest_MultipleMessages()
+public async Task MessageHookTest_MultipleMessages()
 {
     try
     {
-        var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+        var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration()
         {
             ConsumeFrom = new[] { 
                 "DI.PreMatch.Markets.Validated",
@@ -288,7 +288,7 @@ public async Task FlowSyncTest_MultipleMessages()
         // Trigger database changes that affect multiple markets
         await TriggerMultipleMarketChanges();
 
-        var waitForMessagesTask = await FlowSyncStep.ExecuteAsync();
+        var waitForMessagesTask = await MessageHookStep.ExecuteAsync();
         await Task.Delay(3000);
 
         var messages = await waitForMessagesTask.Task;
@@ -375,7 +375,7 @@ public async Task DeleteConsumerGroupAsync()
 ### Multiple Consumers and Producers
 
 ```csharp
-services.AddKafkaFlowSync(builder =>
+services.AddKafkaMessageHook(builder =>
 {
     var kafkaBrokerConfig = Configuration.GetSection("KafkaBrokerConfiguration").Get<KafkaBrokerConfiguration>();
         
@@ -429,7 +429,7 @@ services.AddKafkaFlowSync(builder =>
 
 | Scenario | Use ExpectedMessageKey? | Reason |
 |----------|-------------------------|---------|
-| **Producing Messages** | ❌ **NO** | FlowSync injects `correlationId` automatically |
+| **Producing Messages** | ❌ **NO** | MessageHook injects `correlationId` automatically |
 | **External Events / Key-Based Flows** | ✅ **YES** | No `correlationId` — filter by the known Kafka message key instead |
 | **Database Changes** | ✅ **YES** | No `correlationId` — use the message key to identify the expected event |
 | **External API Triggers** | ✅ **YES** | External systems don't provide correlation IDs |
@@ -451,7 +451,7 @@ ExpectedMessageKey = $"{fixtureId}_{providerId}_{marketType}_{marketId}"
 
 ```csharp
 // ✅ CORRECT - Producing messages (NO ExpectedMessageKey)
-var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration()
 {
     ProduceTo = "OUTPUT_TOPIC",
     ConsumeFrom = new[] { "INPUT_TOPIC" },
@@ -463,13 +463,13 @@ var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncCon
     }
 });
 
-// Execute with message - FlowSync creates correlationId
-await FlowSyncStep.ExecuteAsync(messageKey, message);
+// Execute with message - MessageHook creates correlationId
+await MessageHookStep.ExecuteAsync(messageKey, message);
 ```
 
 ```csharp
 // ✅ CORRECT - MessageKey flows (consume by key, no correlationId)
-var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
+var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration()
 {
     ConsumeFrom = new[] { "INPUT_TOPIC" },
     ConsumingOptions = new ConsumingOptionsConfiguration()
@@ -481,7 +481,7 @@ var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncCon
 });
 
 // Execute without parameters - waiting for message matching the expected key
-await FlowSyncStep.ExecuteAsync();
+await MessageHookStep.ExecuteAsync();
 ```
 
 ## Best Practices
@@ -514,12 +514,12 @@ ConsumingOptions = new ConsumingOptionsConfiguration()
 ### 3. **Use Meaningful Message Keys**
 ```csharp
 var messageKey = $"{fixtureId}_{marketId}"; // Use business identifiers
-await FlowSyncStep.ExecuteAsync(messageKey, testMessage);
+await MessageHookStep.ExecuteAsync(messageKey, testMessage);
 ```
 
 ### 4. **Add Processing Delays**
 ```csharp
-var waitForMessagesTask = await FlowSyncStep.ExecuteAsync(key, message);
+var waitForMessagesTask = await MessageHookStep.ExecuteAsync(key, message);
 await Task.Delay(1000); // Allow message processing time
 var messages = await waitForMessagesTask.Task;
 ```
@@ -541,8 +541,8 @@ Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(messages)); // Log r
 ## Dependencies
 
 Required NuGet packages:
-- `FlowSync.Core`
-- `FlowSync.Kafka`
+- `MessageHook.Core`
+- `MessageHook.Kafka`
 Dependecies
 - `KafkaFlow`
 - `Confluent.Kafka`

@@ -1,6 +1,6 @@
-# FlowSync Framework – AI Recreation Guide
+﻿# MessageHook Framework – AI Recreation Guide
 
-This document is a complete, step-by-step blueprint for recreating the **FlowSync** integration-testing framework from scratch. Every detail needed to replicate the exact project structure, code, configuration, and test patterns is captured here. The consumer start and teardown sections are treated as critical – read them carefully.
+This document is a complete, step-by-step blueprint for recreating the **MessageHook** integration-testing framework from scratch. Every detail needed to replicate the exact project structure, code, configuration, and test patterns is captured here. The consumer start and teardown sections are treated as critical – read them carefully.
 
 ---
 
@@ -10,9 +10,9 @@ This document is a complete, step-by-step blueprint for recreating the **FlowSyn
 2. [Solution Structure](#2-solution-structure)
 3. [Dependency Graph](#3-dependency-graph)
 4. [Project Files (.csproj)](#4-project-files-csproj)
-5. [FlowSync.Core – Abstractions](#5-FlowSynccore--abstractions)
-6. [FlowSync.Orchestration – Orchestration Layer](#6-FlowSyncorchestration--orchestration-layer)
-7. [FlowSync.Kafka – Kafka Implementation](#7-FlowSynckafka--kafka-implementation)
+5. [MessageHook.Core – Abstractions](#5-MessageHookcore--abstractions)
+6. [MessageHook.Orchestration – Orchestration Layer](#6-MessageHookorchestration--orchestration-layer)
+7. [MessageHook.Kafka – Kafka Implementation](#7-MessageHookkafka--kafka-implementation)
 8. [CRITICAL: Start Consumer Pattern](#8-critical-start-consumer-pattern)
 9. [CRITICAL: Teardown Consumer Pattern](#9-critical-teardown-consumer-pattern)
 10. [Test Projects](#10-test-projects)
@@ -25,22 +25,22 @@ This document is a complete, step-by-step blueprint for recreating the **FlowSyn
 
 ## 1. What This Project Is
 
-The FlowSync framework is a **.NET 8 integration-testing library** that lets test code:
+The MessageHook framework is a **.NET 8 integration-testing library** that lets test code:
 
 1. **Produce** a message to a Kafka topic.
 2. **Start a consumer** on a response topic.
 3. **Wait** for a matching response message (filtered by Correlation ID or by Message Key).
 4. **Tear down** the consumer and delete the consumer group so the next test run starts clean.
 
-The framework is published as a set of NuGet packages (`FlowSync.Core`, `FlowSync.Orchestration`, `FlowSync.Kafka`) consumed by integration test projects (`FlowSync.Tests` with xUnit, `FlowSync.NUnit` with NUnit).
+The framework is published as a set of NuGet packages (`MessageHook.Core`, `MessageHook.Orchestration`, `MessageHook.Kafka`) consumed by integration test projects (`MessageHook.Tests` with xUnit, `MessageHook.NUnit` with NUnit).
 
 ---
 
 ## 2. Solution Structure
 
 ```
-flowsync/
-├── FlowSync.sln
+messagehook/
+├── MessageHook.sln
 ├── cicd-main.yml
 ├── variables.yml
 ├── versionconfig.yml
@@ -48,22 +48,22 @@ flowsync/
 │   └── nuget.config
 ├── docs/
 │   └── (markdown docs)
-├── FlowSync.Core/               # abstractions only, no Kafka dependency
-├── FlowSync.Kafka/              # KafkaFlow wiring, consumer, producer
-├── FlowSync.Orchestration/      # factory, FlowSync steps, configuration
-├── FlowSync.Tests/              # xUnit integration tests (not packaged)
-└── FlowSync.NUnit/              # NUnit integration tests (not packaged)
+├── MessageHook.Core/               # abstractions only, no Kafka dependency
+├── MessageHook.Kafka/              # KafkaFlow wiring, consumer, producer
+├── MessageHook.Orchestration/      # factory, MessageHook steps, configuration
+├── MessageHook.Tests/              # xUnit integration tests (not packaged)
+└── MessageHook.NUnit/              # NUnit integration tests (not packaged)
 ```
 
-### Solution file (`FlowSync.sln`)
+### Solution file (`MessageHook.sln`)
 
 ```
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project "FlowSync.Orchestration"  -> FlowSync.Orchestration\FlowSync.Orchestration.csproj
-Project "FlowSync.Core"           -> FlowSync.Core\FlowSync.Core.csproj
-Project "FlowSync.Tests"          -> FlowSync.Tests\FlowSync.Tests.csproj
-Project "FlowSync.Kafka"          -> FlowSync.Kafka\FlowSync.Kafka.csproj
-Project "FlowSync.NUnit"          -> FlowSync.NUnit\FlowSync.NUnit.csproj
+Project "MessageHook.Orchestration"  -> MessageHook.Orchestration\MessageHook.Orchestration.csproj
+Project "MessageHook.Core"           -> MessageHook.Core\MessageHook.Core.csproj
+Project "MessageHook.Tests"          -> MessageHook.Tests\MessageHook.Tests.csproj
+Project "MessageHook.Kafka"          -> MessageHook.Kafka\MessageHook.Kafka.csproj
+Project "MessageHook.NUnit"          -> MessageHook.NUnit\MessageHook.NUnit.csproj
 ```
 
 ---
@@ -71,23 +71,23 @@ Project "FlowSync.NUnit"          -> FlowSync.NUnit\FlowSync.NUnit.csproj
 ## 3. Dependency Graph
 
 ```
-FlowSync.Core
+MessageHook.Core
     ↑
-FlowSync.Orchestration  (ProjectReference → FlowSync.Core)
+MessageHook.Orchestration  (ProjectReference → MessageHook.Core)
     ↑
-FlowSync.Kafka          (ProjectReference → FlowSync.Orchestration)
+MessageHook.Kafka          (ProjectReference → MessageHook.Orchestration)
     ↑
-FlowSync.Tests          (ProjectReference → FlowSync.Kafka + FlowSync.Orchestration)
-FlowSync.NUnit          (ProjectReference → FlowSync.Kafka + FlowSync.Orchestration)
+MessageHook.Tests          (ProjectReference → MessageHook.Kafka + MessageHook.Orchestration)
+MessageHook.NUnit          (ProjectReference → MessageHook.Kafka + MessageHook.Orchestration)
 ```
 
-Rule: nothing in `FlowSync.Core` or `FlowSync.Orchestration` knows about Kafka. The Kafka package is the only one that references `KafkaFlow`.
+Rule: nothing in `MessageHook.Core` or `MessageHook.Orchestration` knows about Kafka. The Kafka package is the only one that references `KafkaFlow`.
 
 ---
 
 ## 4. Project Files (.csproj)
 
-### FlowSync.Core.csproj
+### MessageHook.Core.csproj
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -103,7 +103,7 @@ Rule: nothing in `FlowSync.Core` or `FlowSync.Orchestration` knows about Kafka. 
 </Project>
 ```
 
-### FlowSync.Orchestration.csproj
+### MessageHook.Orchestration.csproj
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -112,21 +112,21 @@ Rule: nothing in `FlowSync.Core` or `FlowSync.Orchestration` knows about Kafka. 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>FlowSync.Orchestration</PackageId>
-    <AssemblyName>FlowSync.Orchestration</AssemblyName>
-    <RootNamespace>FlowSync.Orchestration</RootNamespace>
-    <Authors>FlowSync Framework Team</Authors>
-    <Description>FlowSync orchestration and management framework for integration testing</Description>
+    <PackageId>MessageHook.Orchestration</PackageId>
+    <AssemblyName>MessageHook.Orchestration</AssemblyName>
+    <RootNamespace>MessageHook.Orchestration</RootNamespace>
+    <Authors>MessageHook Framework Team</Authors>
+    <Description>MessageHook orchestration and management framework for integration testing</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FlowSync.Core\FlowSync.Core.csproj" />
+    <ProjectReference Include="..\MessageHook.Core\MessageHook.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>
 </Project>
 ```
 
-### FlowSync.Kafka.csproj
+### MessageHook.Kafka.csproj
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -145,12 +145,12 @@ Rule: nothing in `FlowSync.Core` or `FlowSync.Orchestration` knows about Kafka. 
     <PackageReference Include="Utf8Json" Version="1.3.7" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FlowSync.Orchestration\FlowSync.Orchestration.csproj" />
+    <ProjectReference Include="..\MessageHook.Orchestration\MessageHook.Orchestration.csproj" />
   </ItemGroup>
 </Project>
 ```
 
-### FlowSync.Tests.csproj (xUnit)
+### MessageHook.Tests.csproj (xUnit)
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -188,8 +188,8 @@ Rule: nothing in `FlowSync.Core` or `FlowSync.Orchestration` knows about Kafka. 
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FlowSync.Kafka\FlowSync.Kafka.csproj" />
-    <ProjectReference Include="..\FlowSync.Orchestration\FlowSync.Orchestration.csproj" />
+    <ProjectReference Include="..\MessageHook.Kafka\MessageHook.Kafka.csproj" />
+    <ProjectReference Include="..\MessageHook.Orchestration\MessageHook.Orchestration.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
@@ -199,23 +199,23 @@ Rule: nothing in `FlowSync.Core` or `FlowSync.Orchestration` knows about Kafka. 
 </Project>
 ```
 
-### FlowSync.NUnit.csproj
+### MessageHook.NUnit.csproj
 
-Same as `FlowSync.Tests.csproj` but replace:
+Same as `MessageHook.Tests.csproj` but replace:
 - `xunit`, `xunit.abstractions`, `xunit.runner.visualstudio` → `NUnit 3.13.3`, `NUnit3TestAdapter 4.2.1`, `NUnit.Analyzers 3.6.1`
 - Add `Automation.DataContext Version="3.1.0.152"`
 - Change `appsettings.json` copy rule to `<CopyToOutputDirectory>Always</CopyToOutputDirectory>`
 
 ---
 
-## 5. FlowSync.Core – Abstractions
+## 5. MessageHook.Core – Abstractions
 
-All files are in `FlowSync.Core/`.
+All files are in `MessageHook.Core/`.
 
 ### Messaging/Consuming/IConsumer.cs
 
 ```csharp
-namespace FlowSync.Core.Messaging.Consuming;
+namespace MessageHook.Core.Messaging.Consuming;
 
 public interface IConsumer
 {
@@ -226,9 +226,9 @@ public interface IConsumer
 ### Messaging/Publishing/IProducer.cs
 
 ```csharp
-using FlowSync.Core.Messaging.Publishing.Entities;
+using MessageHook.Core.Messaging.Publishing.Entities;
 
-namespace FlowSync.Core.Messaging.Publishing;
+namespace MessageHook.Core.Messaging.Publishing;
 
 public interface IProducer
 {
@@ -239,7 +239,7 @@ public interface IProducer
 ### Messaging/Publishing/Entities/ProducingExtraData.cs
 
 ```csharp
-namespace FlowSync.Core.Messaging.Publishing.Entities;
+namespace MessageHook.Core.Messaging.Publishing.Entities;
 
 public class ProducingExtraData
 {
@@ -250,11 +250,11 @@ public class ProducingExtraData
 ### Messaging/FilterService/IFilterService.cs
 
 ```csharp
-namespace FlowSync.Core.Messaging.FilterService;
+namespace MessageHook.Core.Messaging.FilterService;
 
 public interface IFilterService
 {
-    void AddFilter(string FlowSyncId);
+    void AddFilter(string MessageHookId);
     string Filter(string obj);
 }
 ```
@@ -264,7 +264,7 @@ public interface IFilterService
 ```csharp
 using Microsoft.Extensions.Logging;
 
-namespace FlowSync.Core.Messaging.FilterService;
+namespace MessageHook.Core.Messaging.FilterService;
 
 public class FilterService : IFilterService
 {
@@ -304,9 +304,9 @@ public class FilterService : IFilterService
         return null;
     }
 
-    public void AddFilter(string FlowSyncId)
+    public void AddFilter(string MessageHookId)
     {
-        filterDict[FlowSyncId] = x => x == FlowSyncId;
+        filterDict[MessageHookId] = x => x == MessageHookId;
     }
 
     public string Filter(string obj) => InvokeFilter(obj);
@@ -316,15 +316,15 @@ public class FilterService : IFilterService
 ### Messaging/Receivers/IMessagePool.cs
 
 ```csharp
-using FlowSync.Core.Messaging.Models;
+using MessageHook.Core.Messaging.Models;
 
-namespace FlowSync.Core.Messaging.Receivers;
+namespace MessageHook.Core.Messaging.Receivers;
 
 public interface IMessagePool
 {
-    List<ResponseContainer> GetMessages(IEnumerable<string> FlowSyncIds);
-    void ClearFlowSyncMessages(string FlowSyncId);
-    void AddMessage(string FlowSyncId, KeyValuePair<object, object> keyValuePair);
+    List<ResponseContainer> GetMessages(IEnumerable<string> MessageHookIds);
+    void ClearMessageHookMessages(string MessageHookId);
+    void AddMessage(string MessageHookId, KeyValuePair<object, object> keyValuePair);
 }
 ```
 
@@ -332,25 +332,25 @@ public interface IMessagePool
 
 ```csharp
 using System.Collections.Concurrent;
-using FlowSync.Core.Messaging.Models;
+using MessageHook.Core.Messaging.Models;
 
-namespace FlowSync.Core.Messaging.Receivers;
+namespace MessageHook.Core.Messaging.Receivers;
 
 public class MessagePool : IMessagePool
 {
     private ConcurrentDictionary<string, List<KeyValuePair<object, object>>> cachedMessages = new();
 
-    public List<ResponseContainer> GetMessages(IEnumerable<string> FlowSyncIds)
+    public List<ResponseContainer> GetMessages(IEnumerable<string> MessageHookIds)
     {
         var allMessages = new List<ResponseContainer>();
-        foreach (var FlowSyncId in FlowSyncIds)
+        foreach (var MessageHookId in MessageHookIds)
         {
-            cachedMessages.TryGetValue(FlowSyncId, out var messages);
+            cachedMessages.TryGetValue(MessageHookId, out var messages);
             if (messages != null && messages.Count > 0)
             {
                 allMessages.Add(new ResponseContainer()
                 {
-                    FlowSyncId = FlowSyncId,
+                    MessageHookId = MessageHookId,
                     Messages = new List<MessageContainer>(messages.ToMessageContainerList())
                 });
             }
@@ -358,15 +358,15 @@ public class MessagePool : IMessagePool
         return allMessages;
     }
 
-    public void ClearFlowSyncMessages(string FlowSyncId)
+    public void ClearMessageHookMessages(string MessageHookId)
     {
-        if (cachedMessages.TryGetValue(FlowSyncId, out _))
-            cachedMessages[FlowSyncId] = new List<KeyValuePair<object, object>>();
+        if (cachedMessages.TryGetValue(MessageHookId, out _))
+            cachedMessages[MessageHookId] = new List<KeyValuePair<object, object>>();
     }
 
-    public void AddMessage(string FlowSyncId, KeyValuePair<object, object> keyValuePair)
+    public void AddMessage(string MessageHookId, KeyValuePair<object, object> keyValuePair)
     {
-        var value = cachedMessages.GetOrAdd(FlowSyncId, s => new List<KeyValuePair<object, object>>());
+        var value = cachedMessages.GetOrAdd(MessageHookId, s => new List<KeyValuePair<object, object>>());
         value.Add(keyValuePair);
     }
 }
@@ -375,11 +375,11 @@ public class MessagePool : IMessagePool
 ### Messaging/Models/ResponseContainer.cs
 
 ```csharp
-namespace FlowSync.Core.Messaging.Models;
+namespace MessageHook.Core.Messaging.Models;
 
 public class ResponseContainer
 {
-    public string FlowSyncId { get; set; }
+    public string MessageHookId { get; set; }
     public List<MessageContainer> Messages { get; set; }
 }
 
@@ -403,14 +403,14 @@ public static class KeyValuePairExtensions
 
 ---
 
-## 6. FlowSync.Orchestration – Orchestration Layer
+## 6. MessageHook.Orchestration – Orchestration Layer
 
-### Configurations/FlowSyncConfiguration.cs
+### Configurations/MessageHookConfiguration.cs
 
 ```csharp
-namespace FlowSync.Orchestration.Configurations;
+namespace MessageHook.Orchestration.Configurations;
 
-public class FlowSyncConfiguration
+public class MessageHookConfiguration
 {
     public IEnumerable<string> ConsumeFrom { get; set; }
     public string ProduceTo { get; set; }
@@ -421,9 +421,9 @@ public class FlowSyncConfiguration
 ### Configurations/ConsumingOptionsConfiguration.cs
 
 ```csharp
-using FlowSync.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.FilterService;
 
-namespace FlowSync.Orchestration.Configurations;
+namespace MessageHook.Orchestration.Configurations;
 
 public class ConsumingOptionsConfiguration
 {
@@ -435,12 +435,12 @@ public class ConsumingOptionsConfiguration
 }
 ```
 
-### Entities/Enums/FlowSyncType.cs
+### Entities/Enums/MessageHookType.cs
 
 ```csharp
-namespace FlowSync.Orchestration.Entities.Enums;
+namespace MessageHook.Orchestration.Entities.Enums;
 
-public enum FlowSyncType
+public enum MessageHookType
 {
     ProduceAndForget,
     ProduceAndWait,
@@ -448,18 +448,18 @@ public enum FlowSyncType
 }
 ```
 
-### Entities/Interfaces/IFlowSyncStep.cs
+### Entities/Interfaces/IMessageHookStep.cs
 
 ```csharp
-using FlowSync.Core.Messaging.Models;
-using FlowSync.Core.Messaging.Publishing.Entities;
-using FlowSync.Orchestration.Entities.Enums;
+using MessageHook.Core.Messaging.Models;
+using MessageHook.Core.Messaging.Publishing.Entities;
+using MessageHook.Orchestration.Entities.Enums;
 
-namespace FlowSync.Orchestration.Entities.Interfaces;
+namespace MessageHook.Orchestration.Entities.Interfaces;
 
-public interface IFlowSyncStep : IExecutableStep
+public interface IMessageHookStep : IExecutableStep
 {
-    FlowSyncType FlowSyncType { get; }
+    MessageHookType MessageHookType { get; }
     Task InitializeAsync();
     Task<TaskCompletionSource<IEnumerable<ResponseContainer>>> ExecuteAsync<T>(string key, T message);
     Task<TaskCompletionSource<IEnumerable<ResponseContainer>>> ExecuteAsync<T>(string key, T message, ProducingExtraData producingExtraData);
@@ -468,49 +468,49 @@ public interface IFlowSyncStep : IExecutableStep
 }
 ```
 
-### Entities/BaseFlowSyncStep.cs
+### Entities/BaseMessageHookStep.cs
 
-`BaseFlowSyncStep` is abstract. It determines `FlowSyncType` from the configuration, provides all `ExecuteAsync` overloads, and runs the polling loop in `GetTaskResultAsync`.
+`BaseMessageHookStep` is abstract. It determines `MessageHookType` from the configuration, provides all `ExecuteAsync` overloads, and runs the polling loop in `GetTaskResultAsync`.
 
 ```csharp
 using System.Diagnostics;
-using FlowSync.Core.Messaging.Consuming;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Models;
-using FlowSync.Core.Messaging.Publishing;
-using FlowSync.Core.Messaging.Publishing.Entities;
-using FlowSync.Core.Messaging.Receivers;
-using FlowSync.Orchestration.Configurations;
-using FlowSync.Orchestration.Entities.Enums;
-using FlowSync.Orchestration.Entities.Interfaces;
-using FlowSync.Core.Extensions;
+using MessageHook.Core.Messaging.Consuming;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Models;
+using MessageHook.Core.Messaging.Publishing;
+using MessageHook.Core.Messaging.Publishing.Entities;
+using MessageHook.Core.Messaging.Receivers;
+using MessageHook.Orchestration.Configurations;
+using MessageHook.Orchestration.Entities.Enums;
+using MessageHook.Orchestration.Entities.Interfaces;
+using MessageHook.Core.Extensions;
 
-namespace FlowSync.Orchestration.Entities;
+namespace MessageHook.Orchestration.Entities;
 
-public abstract class BaseFlowSyncStep : IFlowSyncStep
+public abstract class BaseMessageHookStep : IMessageHookStep
 {
     protected readonly IConsumer _consumer;
     protected readonly IMessagePool _messagePool;
     protected readonly IProducer _producer;
-    protected readonly FlowSyncConfiguration _configuration;
+    protected readonly MessageHookConfiguration _configuration;
     protected readonly IFilterService _filterService;
 
-    public FlowSyncType FlowSyncType
+    public MessageHookType MessageHookType
     {
         get
         {
             if (_configuration.ConsumeFrom.IsNullOrEmpty())
-                return FlowSyncType.ProduceAndForget;
+                return MessageHookType.ProduceAndForget;
             else if (!_configuration.ProduceTo.IsNullOrEmpty())
-                return FlowSyncType.ProduceAndWait;
-            else return FlowSyncType.ConsumeOnly;
+                return MessageHookType.ProduceAndWait;
+            else return MessageHookType.ConsumeOnly;
         }
     }
 
-    protected BaseFlowSyncStep(
+    protected BaseMessageHookStep(
         IConsumer consumer, IProducer producer,
         IFilterService filterService, IMessagePool messagePool,
-        FlowSyncConfiguration configuration)
+        MessageHookConfiguration configuration)
     {
         _producer = producer;
         _configuration = configuration;
@@ -520,7 +520,7 @@ public abstract class BaseFlowSyncStep : IFlowSyncStep
     }
 
     public abstract Task InitializeAsync();
-    protected abstract string GetFlowSyncIdentifier(string topic);
+    protected abstract string GetMessageHookIdentifier(string topic);
     protected abstract string GetClearIdentifier();
     protected abstract void AddProducingHeaders(ProducingExtraData producingExtraData);
 
@@ -544,12 +544,12 @@ public abstract class BaseFlowSyncStep : IFlowSyncStep
 
         var tcs = new TaskCompletionSource<IEnumerable<ResponseContainer>>();
 
-        switch (FlowSyncType)
+        switch (MessageHookType)
         {
-            case FlowSyncType.ProduceAndForget:
+            case MessageHookType.ProduceAndForget:
                 tcs.SetResult(new List<ResponseContainer>());
                 break;
-            case FlowSyncType.ProduceAndWait:
+            case MessageHookType.ProduceAndWait:
                 GetTaskResultAsync(tcs);
                 break;
             default:
@@ -570,17 +570,17 @@ public abstract class BaseFlowSyncStep : IFlowSyncStep
         var sw = new Stopwatch();
         sw.Start();
 
-        IEnumerable<string> consumeFlowSyncIds = _configuration.ConsumeFrom.Select(GetFlowSyncIdentifier);
+        IEnumerable<string> consumeMessageHookIds = _configuration.ConsumeFrom.Select(GetMessageHookIdentifier);
 
         while (sw.Elapsed <= _configuration.ConsumingOptions.TimeOut)
         {
-            var responseContainers = _messagePool.GetMessages(consumeFlowSyncIds);
+            var responseContainers = _messagePool.GetMessages(consumeMessageHookIds);
             if (_configuration.ConsumingOptions.MsgReceivedCount > 0
                 && !responseContainers.IsNullOrEmpty()
                 && responseContainers.Sum(x => x.Messages.Count) >= _configuration.ConsumingOptions.MsgReceivedCount)
             {
                 tcs.SetResult(responseContainers);
-                _messagePool.ClearFlowSyncMessages(GetClearIdentifier());
+                _messagePool.ClearMessageHookMessages(GetClearIdentifier());
                 return;
             }
             await Task.Delay(250);
@@ -592,177 +592,177 @@ public abstract class BaseFlowSyncStep : IFlowSyncStep
 }
 ```
 
-### Entities/CorrelationIdFlowSyncStep.cs
+### Entities/CorrelationIdMessageHookStep.cs
 
-Used when `ExpectedMessageKey` is **not** set. A new GUID is generated per FlowSync instance and injected as both `FlowSyncId` and `correlation_id` headers on the produced message.
+Used when `ExpectedMessageKey` is **not** set. A new GUID is generated per MessageHook instance and injected as both `MessageHookId` and `correlation_id` headers on the produced message.
 
 ```csharp
-using FlowSync.Core.Extensions;
-using FlowSync.Core.Messaging.Consuming;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Publishing;
-using FlowSync.Core.Messaging.Publishing.Entities;
-using FlowSync.Core.Messaging.Receivers;
-using FlowSync.Orchestration.Configurations;
+using MessageHook.Core.Extensions;
+using MessageHook.Core.Messaging.Consuming;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Publishing;
+using MessageHook.Core.Messaging.Publishing.Entities;
+using MessageHook.Core.Messaging.Receivers;
+using MessageHook.Orchestration.Configurations;
 
-namespace FlowSync.Orchestration.Entities;
+namespace MessageHook.Orchestration.Entities;
 
-public class CorrelationIdFlowSyncStep : BaseFlowSyncStep
+public class CorrelationIdMessageHookStep : BaseMessageHookStep
 {
-    private readonly string _FlowSyncId;
+    private readonly string _MessageHookId;
 
-    public CorrelationIdFlowSyncStep(
+    public CorrelationIdMessageHookStep(
         IConsumer consumer, IProducer producer,
         IFilterService filterService, IMessagePool messagePool,
-        FlowSyncConfiguration configuration)
+        MessageHookConfiguration configuration)
         : base(consumer, producer, filterService, messagePool, configuration)
     {
-        _FlowSyncId = Guid.NewGuid().ToString();
+        _MessageHookId = Guid.NewGuid().ToString();
     }
 
     public override async Task InitializeAsync()
     {
-        if (FlowSyncType == Enums.FlowSyncType.ProduceAndWait)
+        if (MessageHookType == Enums.MessageHookType.ProduceAndWait)
         {
             foreach (var consumeFrom in _configuration.ConsumeFrom)
             {
-                var consumeFlowSyncId = _FlowSyncId.AddPrefix($"{consumeFrom}_");
-                _filterService.AddFilter(consumeFlowSyncId);
+                var consumeMessageHookId = _MessageHookId.AddPrefix($"{consumeFrom}_");
+                _filterService.AddFilter(consumeMessageHookId);
             }
             foreach (var consumeFrom in _configuration.ConsumeFrom)
                 await _consumer.StartConsumeAsync(consumeFrom);
         }
-        else if (FlowSyncType == Enums.FlowSyncType.ConsumeOnly)
+        else if (MessageHookType == Enums.MessageHookType.ConsumeOnly)
         {
             foreach (var consumeFrom in _configuration.ConsumeFrom)
             {
                 var expectedCorrelationId = _configuration.ConsumingOptions.ExpectedCorrelationId;
-                var consumeFlowSyncId = expectedCorrelationId.AddPrefix($"{consumeFrom}_");
-                _filterService.AddFilter(consumeFlowSyncId);
+                var consumeMessageHookId = expectedCorrelationId.AddPrefix($"{consumeFrom}_");
+                _filterService.AddFilter(consumeMessageHookId);
                 await _consumer.StartConsumeAsync(consumeFrom);
             }
         }
     }
 
-    protected override string GetFlowSyncIdentifier(string topic)
+    protected override string GetMessageHookIdentifier(string topic)
     {
-        if (FlowSyncType == Enums.FlowSyncType.ProduceAndWait)
-            return _FlowSyncId.AddPrefix($"{topic}_");
-        if (FlowSyncType == Enums.FlowSyncType.ConsumeOnly)
+        if (MessageHookType == Enums.MessageHookType.ProduceAndWait)
+            return _MessageHookId.AddPrefix($"{topic}_");
+        if (MessageHookType == Enums.MessageHookType.ConsumeOnly)
             return _configuration.ConsumingOptions.ExpectedCorrelationId.AddPrefix($"{topic}_");
-        throw new InvalidOperationException($"Unsupported FlowSync type: {FlowSyncType}");
+        throw new InvalidOperationException($"Unsupported MessageHook type: {MessageHookType}");
     }
 
     protected override string GetClearIdentifier()
-        => FlowSyncType == Enums.FlowSyncType.ProduceAndWait
-            ? _FlowSyncId
+        => MessageHookType == Enums.MessageHookType.ProduceAndWait
+            ? _MessageHookId
             : _configuration.ConsumingOptions.ExpectedCorrelationId;
 
     protected override void AddProducingHeaders(ProducingExtraData producingExtraData)
     {
-        producingExtraData.Headers.Add("FlowSyncId", _FlowSyncId);
-        producingExtraData.Headers.Add("correlation_id", _FlowSyncId);
+        producingExtraData.Headers.Add("MessageHookId", _MessageHookId);
+        producingExtraData.Headers.Add("correlation_id", _MessageHookId);
     }
 }
 ```
 
-### Entities/MessageKeyFlowSyncStep.cs
+### Entities/MessageKeyMessageHookStep.cs
 
 Used when `ConsumingOptions.ExpectedMessageKey` **is** set. Filtering is based on the Kafka message key rather than a header.
 
 ```csharp
-using FlowSync.Core.Extensions;
-using FlowSync.Core.Messaging.Consuming;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Publishing;
-using FlowSync.Core.Messaging.Publishing.Entities;
-using FlowSync.Core.Messaging.Receivers;
-using FlowSync.Orchestration.Configurations;
+using MessageHook.Core.Extensions;
+using MessageHook.Core.Messaging.Consuming;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Publishing;
+using MessageHook.Core.Messaging.Publishing.Entities;
+using MessageHook.Core.Messaging.Receivers;
+using MessageHook.Orchestration.Configurations;
 
-namespace FlowSync.Orchestration.Entities;
+namespace MessageHook.Orchestration.Entities;
 
-public class MessageKeyFlowSyncStep : BaseFlowSyncStep
+public class MessageKeyMessageHookStep : BaseMessageHookStep
 {
     private readonly string _expectedMessageKey;
 
-    public MessageKeyFlowSyncStep(
+    public MessageKeyMessageHookStep(
         IConsumer consumer, IProducer producer,
         IFilterService filterService, IMessagePool messagePool,
-        FlowSyncConfiguration configuration)
+        MessageHookConfiguration configuration)
         : base(consumer, producer, filterService, messagePool, configuration)
     {
         _expectedMessageKey = configuration.ConsumingOptions?.ExpectedMessageKey
-            ?? throw new ArgumentException("ExpectedMessageKey is required for MessageKeyFlowSyncStep");
+            ?? throw new ArgumentException("ExpectedMessageKey is required for MessageKeyMessageHookStep");
     }
 
     public override async Task InitializeAsync()
     {
-        if (FlowSyncType == Enums.FlowSyncType.ProduceAndWait || FlowSyncType == Enums.FlowSyncType.ConsumeOnly)
+        if (MessageHookType == Enums.MessageHookType.ProduceAndWait || MessageHookType == Enums.MessageHookType.ConsumeOnly)
         {
             foreach (var consumeFrom in _configuration.ConsumeFrom)
             {
-                var consumeFlowSyncId = _expectedMessageKey.AddPrefix($"{consumeFrom}_key_");
-                _filterService.AddFilter(consumeFlowSyncId);
+                var consumeMessageHookId = _expectedMessageKey.AddPrefix($"{consumeFrom}_key_");
+                _filterService.AddFilter(consumeMessageHookId);
             }
             foreach (var consumeFrom in _configuration.ConsumeFrom)
                 await _consumer.StartConsumeAsync(consumeFrom);
         }
     }
 
-    protected override string GetFlowSyncIdentifier(string topic)
+    protected override string GetMessageHookIdentifier(string topic)
         => _expectedMessageKey.AddPrefix($"{topic}_key_");
 
     protected override string GetClearIdentifier() => _expectedMessageKey;
 
     protected override void AddProducingHeaders(ProducingExtraData producingExtraData)
     {
-        producingExtraData.Headers.Add("FlowSyncId", _configuration.ConsumingOptions.ExpectedMessageKey);
+        producingExtraData.Headers.Add("MessageHookId", _configuration.ConsumingOptions.ExpectedMessageKey);
         producingExtraData.Headers.Add("correlation_id", Guid.NewGuid().ToString());
     }
 }
 ```
 
-### Factories/IFlowSyncFactory.cs + FlowSyncFactory.cs
+### Factories/IMessageHookFactory.cs + MessageHookFactory.cs
 
 ```csharp
-// IFlowSyncFactory.cs
-using FlowSync.Orchestration.Configurations;
-using FlowSync.Orchestration.Entities.Interfaces;
+// IMessageHookFactory.cs
+using MessageHook.Orchestration.Configurations;
+using MessageHook.Orchestration.Entities.Interfaces;
 
-namespace FlowSync.Orchestration.Factories;
+namespace MessageHook.Orchestration.Factories;
 
-public interface IFlowSyncFactory
+public interface IMessageHookFactory
 {
-    Task<IFlowSyncStep> CreateFlowSyncStepAsync(FlowSyncConfiguration configuration);
+    Task<IMessageHookStep> CreateMessageHookStepAsync(MessageHookConfiguration configuration);
 }
 ```
 
 ```csharp
-// FlowSyncFactory.cs
-using FlowSync.Core.Messaging.Consuming;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Publishing;
-using FlowSync.Core.Messaging.Receivers;
-using FlowSync.Orchestration.Configurations;
-using FlowSync.Orchestration.Entities;
-using FlowSync.Orchestration.Entities.Interfaces;
+// MessageHookFactory.cs
+using MessageHook.Core.Messaging.Consuming;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Publishing;
+using MessageHook.Core.Messaging.Receivers;
+using MessageHook.Orchestration.Configurations;
+using MessageHook.Orchestration.Entities;
+using MessageHook.Orchestration.Entities.Interfaces;
 
-namespace FlowSync.Orchestration.Factories;
+namespace MessageHook.Orchestration.Factories;
 
-public class FlowSyncFactory(
+public class MessageHookFactory(
     IConsumer consumer,
     IProducer producer,
     IFilterService filterService,
-    IMessagePool messagePool) : IFlowSyncFactory
+    IMessagePool messagePool) : IMessageHookFactory
 {
-    public async Task<IFlowSyncStep> CreateFlowSyncStepAsync(FlowSyncConfiguration configuration)
+    public async Task<IMessageHookStep> CreateMessageHookStepAsync(MessageHookConfiguration configuration)
     {
-        IFlowSyncStep FlowSyncStep = DetermineFlowSyncStepType(configuration);
-        await FlowSyncStep.InitializeAsync();
-        return FlowSyncStep;
+        IMessageHookStep MessageHookStep = DetermineMessageHookStepType(configuration);
+        await MessageHookStep.InitializeAsync();
+        return MessageHookStep;
     }
 
-    private IFlowSyncStep DetermineFlowSyncStepType(FlowSyncConfiguration configuration)
+    private IMessageHookStep DetermineMessageHookStepType(MessageHookConfiguration configuration)
     {
         var hasMessageKey = !string.IsNullOrEmpty(configuration.ConsumingOptions?.ExpectedMessageKey);
         var hasCorrelationId = !string.IsNullOrEmpty(configuration.ConsumingOptions?.ExpectedCorrelationId);
@@ -771,10 +771,10 @@ public class FlowSyncFactory(
             throw new ArgumentException("Cannot specify both ExpectedMessageKey and ExpectedCorrelationId.");
 
         if (hasMessageKey)
-            return new MessageKeyFlowSyncStep(consumer, producer, filterService, messagePool, configuration);
+            return new MessageKeyMessageHookStep(consumer, producer, filterService, messagePool, configuration);
 
         // Default: correlation ID mode (backward compatible)
-        return new CorrelationIdFlowSyncStep(consumer, producer, filterService, messagePool, configuration);
+        return new CorrelationIdMessageHookStep(consumer, producer, filterService, messagePool, configuration);
     }
 }
 ```
@@ -782,18 +782,18 @@ public class FlowSyncFactory(
 ### Host/HostExtensions.cs
 
 ```csharp
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Receivers;
-using FlowSync.Orchestration.Factories;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Receivers;
+using MessageHook.Orchestration.Factories;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FlowSync.Orchestration.Host;
+namespace MessageHook.Orchestration.Host;
 
 public static class HostExtensions
 {
-    public static IServiceCollection AddFlowSyncService(this IServiceCollection serviceCollection)
+    public static IServiceCollection AddMessageHookService(this IServiceCollection serviceCollection)
     {
-        serviceCollection.AddSingleton<IFlowSyncFactory, FlowSyncFactory>();
+        serviceCollection.AddSingleton<IMessageHookFactory, MessageHookFactory>();
         serviceCollection.AddSingleton<IFilterService, FilterService>();
         serviceCollection.AddSingleton<IMessagePool, MessagePool>();
         return serviceCollection;
@@ -803,14 +803,14 @@ public static class HostExtensions
 
 ---
 
-## 7. FlowSync.Kafka – Kafka Implementation
+## 7. MessageHook.Kafka – Kafka Implementation
 
 ### Configurations
 
 #### KafkaBrokerConfiguration.cs
 
 ```csharp
-namespace FlowSync.Kafka.Configurations;
+namespace MessageHook.Kafka.Configurations;
 
 public class KafkaBrokerConfiguration
 {
@@ -822,7 +822,7 @@ public class KafkaBrokerConfiguration
 #### KafkaCredentialsConfiguration.cs
 
 ```csharp
-namespace FlowSync.Kafka.Configurations;
+namespace MessageHook.Kafka.Configurations;
 
 public class KafkaCredentialsConfiguration
 {
@@ -855,7 +855,7 @@ public class KafkaCredentialsConfiguration
 ```csharp
 using KafkaFlow;
 
-namespace FlowSync.Kafka.Configurations;
+namespace MessageHook.Kafka.Configurations;
 
 public class KafkaConsumerConfiguration
 {
@@ -873,7 +873,7 @@ public class KafkaConsumerConfiguration
 ```csharp
 using KafkaFlow;
 
-namespace FlowSync.Kafka.Configurations;
+namespace MessageHook.Kafka.Configurations;
 
 public class KafkaProducerConfiguration
 {
@@ -888,13 +888,13 @@ public class KafkaProducerConfiguration
 
 ```csharp
 using System.Text;
-using FlowSync.Core.Extensions;
-using FlowSync.Core.Messaging.FilterService;
-using FlowSync.Core.Messaging.Receivers;
+using MessageHook.Core.Extensions;
+using MessageHook.Core.Messaging.FilterService;
+using MessageHook.Core.Messaging.Receivers;
 using KafkaFlow;
 using Microsoft.Extensions.Logging;
 
-namespace FlowSync.Kafka.Middlewares;
+namespace MessageHook.Kafka.Middlewares;
 
 public class FilterMiddleware : IMessageMiddleware
 {
@@ -915,11 +915,11 @@ public class FilterMiddleware : IMessageMiddleware
         var correlationId = GetCorrelationId(context);
         if (correlationId != null)
         {
-            var FlowSyncIdentifier = correlationId.AddPrefix($"{context.ConsumerContext.Topic}_");
-            var FlowSyncId = _filterService.Filter(FlowSyncIdentifier);
-            if (FlowSyncId != null)
+            var MessageHookIdentifier = correlationId.AddPrefix($"{context.ConsumerContext.Topic}_");
+            var MessageHookId = _filterService.Filter(MessageHookIdentifier);
+            if (MessageHookId != null)
             {
-                context.Items["FlowSyncId"] = FlowSyncId;
+                context.Items["MessageHookId"] = MessageHookId;
                 await next(context).ConfigureAwait(false);
                 return;
             }
@@ -929,16 +929,16 @@ public class FilterMiddleware : IMessageMiddleware
         var messageKey = Encoding.UTF8.GetString(context.Message.Key as byte[]);
         if (messageKey != null)
         {
-            var FlowSyncIdentifier = messageKey.AddPrefix($"{context.ConsumerContext.Topic}_key_");
-            var FlowSyncId = _filterService.Filter(FlowSyncIdentifier);
-            if (FlowSyncId != null)
+            var MessageHookIdentifier = messageKey.AddPrefix($"{context.ConsumerContext.Topic}_key_");
+            var MessageHookId = _filterService.Filter(MessageHookIdentifier);
+            if (MessageHookId != null)
             {
-                context.Items["FlowSyncId"] = FlowSyncId;
+                context.Items["MessageHookId"] = MessageHookId;
                 await next(context).ConfigureAwait(false);
                 return;
             }
         }
-        // Message is silently dropped – no matching FlowSync
+        // Message is silently dropped – no matching MessageHook
     }
 
     private string? GetCorrelationId(IMessageContext context)
@@ -956,10 +956,10 @@ public class FilterMiddleware : IMessageMiddleware
 ### Middlewares/PushMessageMiddleware.cs
 
 ```csharp
-using FlowSync.Core.Messaging.Receivers;
+using MessageHook.Core.Messaging.Receivers;
 using KafkaFlow;
 
-namespace FlowSync.Kafka.Middlewares;
+namespace MessageHook.Kafka.Middlewares;
 
 public class PushMessageMiddleware : IMessageMiddleware
 {
@@ -973,7 +973,7 @@ public class PushMessageMiddleware : IMessageMiddleware
     public Task Invoke(IMessageContext context, MiddlewareDelegate next)
     {
         _messagePool.AddMessage(
-            context.Items["FlowSyncId"].ToString(),
+            context.Items["MessageHookId"].ToString(),
             new KeyValuePair<object, object>(context.Message.Key, context.Message.Value));
         return next(context);
     }
@@ -986,7 +986,7 @@ public class PushMessageMiddleware : IMessageMiddleware
 using KafkaFlow;
 using Microsoft.Extensions.Logging;
 
-namespace FlowSync.Kafka.Middlewares;
+namespace MessageHook.Kafka.Middlewares;
 
 public class ErrorHandlingMiddleware : IMessageMiddleware
 {
@@ -1021,15 +1021,15 @@ The builder constructs the full KafkaFlow topology. Important points:
 - `IKafkaBus` is registered as a singleton via `resolve.CreateKafkaBus()` – **do not call `StartAsync` on it here**.
 
 ```csharp
-using FlowSync.Kafka.Configurations;
-using FlowSync.Kafka.Middlewares;
+using MessageHook.Kafka.Configurations;
+using MessageHook.Kafka.Middlewares;
 using KafkaFlow;
 using Microsoft.Extensions.DependencyInjection;
 using AutoOffsetReset = KafkaFlow.AutoOffsetReset;
 using SaslMechanism = KafkaFlow.Configuration.SaslMechanism;
 using SecurityProtocol = KafkaFlow.Configuration.SecurityProtocol;
 
-namespace FlowSync.Kafka.Builders;
+namespace MessageHook.Kafka.Builders;
 
 public class KafkaConfigurationBuilder : IKafkaConfigurationBuilder
 {
@@ -1143,18 +1143,18 @@ public class KafkaConfigurationBuilder : IKafkaConfigurationBuilder
 
 ### Extensions/HostExtensions.cs
 
-The single entry point for test DI setup. `AddKafkaFlowSync` is the method tests call.
+The single entry point for test DI setup. `AddKafkaMessageHook` is the method tests call.
 
 ```csharp
-using FlowSync.Core.Messaging.Consuming;
-using FlowSync.Core.Messaging.Publishing;
-using FlowSync.Kafka.Builders;
-using FlowSync.Kafka.Consumers;
-using FlowSync.Kafka.Producers;
-using FlowSync.Orchestration.Host;
+using MessageHook.Core.Messaging.Consuming;
+using MessageHook.Core.Messaging.Publishing;
+using MessageHook.Kafka.Builders;
+using MessageHook.Kafka.Consumers;
+using MessageHook.Kafka.Producers;
+using MessageHook.Orchestration.Host;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FlowSync.Kafka.Extensions;
+namespace MessageHook.Kafka.Extensions;
 
 public static class HostExtensions
 {
@@ -1164,12 +1164,12 @@ public static class HostExtensions
         return services;
     }
 
-    public static IServiceCollection AddKafkaFlowSync(
+    public static IServiceCollection AddKafkaMessageHook(
         this IServiceCollection serviceCollection,
         Action<IKafkaConfigurationBuilder> kafkaConfigurationBuilder)
     {
         serviceCollection
-            .AddFlowSyncService()
+            .AddMessageHookService()
             .AddSingleton<IConsumer, KafkaConsumer>()
             .AddSingleton<IProducer, KafkaProducer>();
 
@@ -1186,20 +1186,20 @@ public static class HostExtensions
 
 ## 8. CRITICAL: Start Consumer Pattern
 
-> This section describes the exact start-up sequence every time a FlowSync step is initialized. **Do not simplify or skip any step.**
+> This section describes the exact start-up sequence every time a MessageHook step is initialized. **Do not simplify or skip any step.**
 
 ### Location
 
-`FlowSync.Kafka/Consumers/KafkaConsumer.cs` implements `IConsumer.StartConsumeAsync`.
+`MessageHook.Kafka/Consumers/KafkaConsumer.cs` implements `IConsumer.StartConsumeAsync`.
 
 ### Full Implementation
 
 ```csharp
 using KafkaFlow;
 using KafkaFlow.Consumers;
-using IConsumer = FlowSync.Core.Messaging.Consuming.IConsumer;
+using IConsumer = MessageHook.Core.Messaging.Consuming.IConsumer;
 
-namespace FlowSync.Kafka.Consumers;
+namespace MessageHook.Kafka.Consumers;
 
 public class KafkaConsumer : IConsumer
 {
@@ -1256,7 +1256,7 @@ public class KafkaConsumer : IConsumer
 
 ### Flow in Context
 
-`FlowSyncFactory.CreateFlowSyncStepAsync` calls `FlowSyncStep.InitializeAsync()` which calls `_consumer.StartConsumeAsync(topic)` per consumed topic. The call is awaited, so the test does not execute until the consumer is fully ready.
+`MessageHookFactory.CreateMessageHookStepAsync` calls `MessageHookStep.InitializeAsync()` which calls `_consumer.StartConsumeAsync(topic)` per consumed topic. The call is awaited, so the test does not execute until the consumer is fully ready.
 
 ---
 
@@ -1266,7 +1266,7 @@ public class KafkaConsumer : IConsumer
 
 ### Location
 
-`FlowSync.Tests/GeneralTests.cs` (xUnit) and `FlowSync.NUnit/MessageKeyFlowSyncTest.cs` (NUnit) both implement `DeleteConsumerGroupAsync`. The implementations are identical in logic.
+`MessageHook.Tests/GeneralTests.cs` (xUnit) and `MessageHook.NUnit/MessageKeyMessageHookTest.cs` (NUnit) both implement `DeleteConsumerGroupAsync`. The implementations are identical in logic.
 
 ### Full Implementation
 
@@ -1356,7 +1356,7 @@ public async Task DeleteConsumerGroupAsync()
 
 ```csharp
 [Fact]
-public async Task FlowSyncTest()
+public async Task MessageHookTest()
 {
     try
     {
@@ -1431,8 +1431,8 @@ public class GeneralTests
         services.AddSingleton<FixtureMarketFactory>();
         services.AddLogging(lb => lb.AddConsole());
 
-        // 3. Wire up the FlowSync framework with Kafka
-        services.AddKafkaFlowSync(builder =>
+        // 3. Wire up the MessageHook framework with Kafka
+        services.AddKafkaMessageHook(builder =>
         {
             var kafkaBrokerConfig = Configuration
                 .GetSection("KafkaBrokerConfiguration")
@@ -1479,12 +1479,12 @@ public void SetUp()
         .AddEnvironmentVariables()
         .AddPlaceholderResolver()
         .Build();
-    services.AddFlowSyncService();       // ← also valid instead of AddKafkaFlowSync when you need manual wiring
+    services.AddMessageHookService();       // ← also valid instead of AddKafkaMessageHook when you need manual wiring
     services.AddSingleton<FixtureMarketFactory>();
     services.AddLogging(lb => lb.AddConsole());
     services.AddSingleton<IConfiguration>(_ => Configuration);
 
-    services.AddKafkaFlowSync(builder =>
+    services.AddKafkaMessageHook(builder =>
     {
         var kafkaBrokerConfig = Configuration
             .GetSection("KafkaBrokerConfiguration")
@@ -1520,13 +1520,13 @@ public void SetUp()
 
 ```csharp
 [Fact]
-public async Task FlowSyncTest()
+public async Task MessageHookTest()
 {
     try
     {
-        // 1. Create the FlowSync step – this starts the consumer internally
-        var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-        var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration
+        // 1. Create the MessageHook step – this starts the consumer internally
+        var MessageHookFactory = _provider.GetRequiredService<IMessageHookFactory>();
+        var MessageHookService = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration
         {
             ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
             ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -1549,7 +1549,7 @@ public async Task FlowSyncTest()
         };
 
         // 3. Produce and get a task that will complete when the response arrives
-        var waitForMessagesTask = await FlowSyncService.ExecuteAsync(
+        var waitForMessagesTask = await MessageHookService.ExecuteAsync(
             $"{fixtureMarket.FixtureId}_{fixtureMarket.MarketId}", message);
 
         await Task.Delay(1000);
@@ -1570,12 +1570,12 @@ public async Task FlowSyncTest()
 
 ```csharp
 [Test]
-public async Task MessageKeyFlowSyncTest_ProduceWithKeyAndConsumeByKey()
+public async Task MessageKeyMessageHookTest_ProduceWithKeyAndConsumeByKey()
 {
     try
     {
-        var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-        var FlowSyncService = await FlowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration
+        var MessageHookFactory = _provider.GetRequiredService<IMessageHookFactory>();
+        var MessageHookService = await MessageHookFactory.CreateMessageHookStepAsync(new MessageHookConfiguration
         {
             ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
             ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
@@ -1587,7 +1587,7 @@ public async Task MessageKeyFlowSyncTest_ProduceWithKeyAndConsumeByKey()
             }
         });
 
-        var waitForMessagesTask = await FlowSyncService.ExecuteAsync(
+        var waitForMessagesTask = await MessageHookService.ExecuteAsync(
             $"{fixtureMarket.FixtureId}_{fixtureMarket.MarketId}", message);
 
         await Task.Delay(1000);
@@ -1608,7 +1608,7 @@ public async Task MessageKeyFlowSyncTest_ProduceWithKeyAndConsumeByKey()
 Create one consts class per test project with all Kafka topic and group names:
 
 ```csharp
-namespace FlowSync.Tests.Consts;
+namespace MessageHook.Tests.Consts;
 
 public class OutliersConsts
 {
@@ -1795,7 +1795,7 @@ steps:
 ```yaml
 variables:
   nugetconfig:   ./nuget/nuget.config
-  solution:      ./FlowSync.sln
+  solution:      ./MessageHook.sln
   releaseconfig: Release
   feedname:      DataIntegrityInfra/DIGeneralFeed
   packlocation:  ./**
@@ -1837,8 +1837,8 @@ next-version: 5.1.0
 Test Constructor / [SetUp]
   │
   ├─ Build IConfiguration (appsettings.json + env vars + Steeltoe placeholders)
-  ├─ services.AddKafkaFlowSync(...)
-  │     ├─ AddFlowSyncService() → registers IFlowSyncFactory, IFilterService, IMessagePool
+  ├─ services.AddKafkaMessageHook(...)
+  │     ├─ AddMessageHookService() → registers IMessageHookFactory, IFilterService, IMessagePool
   │     ├─ Singleton<IConsumer, KafkaConsumer>
   │     ├─ Singleton<IProducer, KafkaProducer>
   │     └─ KafkaConfigurationBuilder.BuildKafkaFlow()
@@ -1848,30 +1848,30 @@ Test Constructor / [SetUp]
 
 Test body
   │
-  ├─ FlowSyncFactory.CreateFlowSyncStepAsync(config)
+  ├─ MessageHookFactory.CreateMessageHookStepAsync(config)
   │     ├─ Determines step type (CorrelationId vs MessageKey)
-  │     └─ FlowSyncStep.InitializeAsync()
-  │           ├─ filterService.AddFilter(FlowSyncId)   ← registers expected identifier
+  │     └─ MessageHookStep.InitializeAsync()
+  │           ├─ filterService.AddFilter(MessageHookId)   ← registers expected identifier
   │           └─ consumer.StartConsumeAsync(topic)    ← SEE SECTION 8
   │
-  ├─ FlowSyncService.ExecuteAsync(key, message)
-  │     ├─ AddProducingHeaders (FlowSyncId / correlation_id)
+  ├─ MessageHookService.ExecuteAsync(key, message)
+  │     ├─ AddProducingHeaders (MessageHookId / correlation_id)
   │     ├─ producer.ProduceAsync(topic, key, message, headers)
   │     └─ Returns TaskCompletionSource (polls MessagePool every 250ms)
   │
   ├─ await Task.Delay(1000)   ← allow the message to travel through the system
   │
   └─ var messages = await waitForMessagesTask.Task
-        └─ BaseFlowSyncStep.GetTaskResultAsync polls _messagePool until
+        └─ BaseMessageHookStep.GetTaskResultAsync polls _messagePool until
            MsgReceivedCount satisfied or TimeOut
 
 On each consumed message
   │
   ├─ ErrorHandlingMiddleware  (wraps in try/catch)
   ├─ FilterMiddleware         (correlation ID header → then message key)
-  │     └─ if match: sets context.Items["FlowSyncId"]
+  │     └─ if match: sets context.Items["MessageHookId"]
   ├─ Deserializer
-  └─ PushMessageMiddleware    (adds to MessagePool under FlowSyncId)
+  └─ PushMessageMiddleware    (adds to MessagePool under MessageHookId)
 
 finally block
   └─ DeleteConsumerGroupAsync()   ← SEE SECTION 9

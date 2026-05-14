@@ -1,14 +1,14 @@
-# Migration Guide: FlowSyncService → FlowSync.Orchestration
+﻿# Migration Guide: MessageHookService → MessageHook.Orchestration
 
 ## Overview
 
-Version 2.0.0 introduces a **breaking change**: the `FlowSyncService` project has been renamed to `FlowSync.Orchestration` to better reflect its purpose as an orchestration framework for integration testing.
+Version 2.0.0 introduces a **breaking change**: the `MessageHookService` project has been renamed to `MessageHook.Orchestration` to better reflect its purpose as an orchestration framework for integration testing.
 
 ## What Changed?
 
 ### Package Name
-- **Old**: `FlowSyncService`
-- **New**: `FlowSync.Orchestration`
+- **Old**: `MessageHookService`
+- **New**: `MessageHook.Orchestration`
 
 ### Version
 - **Old**: 1.x.x
@@ -19,13 +19,13 @@ All namespaces have been updated:
 
 | Old Namespace | New Namespace |
 |---------------|---------------|
-| `FlowSyncService` | `FlowSync.Orchestration` |
-| `FlowSyncService.Configurations` | `FlowSync.Orchestration.Configurations` |
-| `FlowSyncService.Entities` | `FlowSync.Orchestration.Entities` |
-| `FlowSyncService.Entities.Enums` | `FlowSync.Orchestration.Entities.Enums` |
-| `FlowSyncService.Entities.Interfaces` | `FlowSync.Orchestration.Entities.Interfaces` |
-| `FlowSyncService.Factories` | `FlowSync.Orchestration.Factories` |
-| `FlowSyncService.Host` | `FlowSync.Orchestration.Host` |
+| `MessageHookService` | `MessageHook.Orchestration` |
+| `MessageHookService.Configurations` | `MessageHook.Orchestration.Configurations` |
+| `MessageHookService.Entities` | `MessageHook.Orchestration.Entities` |
+| `MessageHookService.Entities.Enums` | `MessageHook.Orchestration.Entities.Enums` |
+| `MessageHookService.Entities.Interfaces` | `MessageHook.Orchestration.Entities.Interfaces` |
+| `MessageHookService.Factories` | `MessageHook.Orchestration.Factories` |
+| `MessageHookService.Host` | `MessageHook.Orchestration.Host` |
 
 ## Migration Steps
 
@@ -35,10 +35,10 @@ If you're referencing the project directly:
 
 ```xml
 <!-- OLD -->
-<ProjectReference Include="../FlowSyncService/FlowSyncService.csproj" />
+<ProjectReference Include="../MessageHookService/MessageHookService.csproj" />
 
 <!-- NEW -->
-<ProjectReference Include="../FlowSync.Orchestration/FlowSync.Orchestration.csproj" />
+<ProjectReference Include="../MessageHook.Orchestration/MessageHook.Orchestration.csproj" />
 ```
 
 ### Step 2: Update NuGet Package Reference
@@ -47,10 +47,10 @@ If you're consuming via NuGet:
 
 ```xml
 <!-- OLD -->
-<PackageReference Include="FlowSyncService" Version="1.x.x" />
+<PackageReference Include="MessageHookService" Version="1.x.x" />
 
 <!-- NEW -->
-<PackageReference Include="FlowSync.Orchestration" Version="2.0.0" />
+<PackageReference Include="MessageHook.Orchestration" Version="2.0.0" />
 ```
 
 ### Step 3: Update Using Statements
@@ -59,16 +59,16 @@ Update all using statements in your code:
 
 ```csharp
 // OLD
-using FlowSyncService.Configurations;
-using FlowSyncService.Factories;
-using FlowSyncService.Host;
-using FlowSyncService.Entities.Interfaces;
+using MessageHookService.Configurations;
+using MessageHookService.Factories;
+using MessageHookService.Host;
+using MessageHookService.Entities.Interfaces;
 
 // NEW
-using FlowSync.Orchestration.Configurations;
-using FlowSync.Orchestration.Factories;
-using FlowSync.Orchestration.Host;
-using FlowSync.Orchestration.Entities.Interfaces;
+using MessageHook.Orchestration.Configurations;
+using MessageHook.Orchestration.Factories;
+using MessageHook.Orchestration.Host;
+using MessageHook.Orchestration.Entities.Interfaces;
 ```
 
 ### Step 4: Rebuild and Test
@@ -86,28 +86,28 @@ For quick migration across multiple files:
 
 ### Visual Studio / Rider
 1. Press `Ctrl+Shift+H` (Find and Replace in Files)
-2. Find: `using FlowSyncService`
-3. Replace with: `using FlowSync.Orchestration`
+2. Find: `using MessageHookService`
+3. Replace with: `using MessageHook.Orchestration`
 4. Click "Replace All"
 
 ### Command Line (Unix/Mac)
 ```bash
 # Update using statements
-find . -name "*.cs" -type f -exec sed -i '' 's/using FlowSyncService/using FlowSync.Orchestration/g' {} +
+find . -name "*.cs" -type f -exec sed -i '' 's/using MessageHookService/using MessageHook.Orchestration/g' {} +
 
 # Update project references in .csproj files
-find . -name "*.csproj" -type f -exec sed -i '' 's/FlowSyncService\.csproj/FlowSync.Orchestration.csproj/g' {} +
-find . -name "*.csproj" -type f -exec sed -i '' 's/Include="FlowSyncService"/Include="FlowSync.Orchestration"/g' {} +
+find . -name "*.csproj" -type f -exec sed -i '' 's/MessageHookService\.csproj/MessageHook.Orchestration.csproj/g' {} +
+find . -name "*.csproj" -type f -exec sed -i '' 's/Include="MessageHookService"/Include="MessageHook.Orchestration"/g' {} +
 ```
 
 ### Command Line (Linux)
 ```bash
 # Update using statements
-find . -name "*.cs" -type f -exec sed -i 's/using FlowSyncService/using FlowSync.Orchestration/g' {} +
+find . -name "*.cs" -type f -exec sed -i 's/using MessageHookService/using MessageHook.Orchestration/g' {} +
 
 # Update project references in .csproj files
-find . -name "*.csproj" -type f -exec sed -i 's/FlowSyncService\.csproj/FlowSync.Orchestration.csproj/g' {} +
-find . -name "*.csproj" -type f -exec sed -i 's/Include="FlowSyncService"/Include="FlowSync.Orchestration"/g' {} +
+find . -name "*.csproj" -type f -exec sed -i 's/MessageHookService\.csproj/MessageHook.Orchestration.csproj/g' {} +
+find . -name "*.csproj" -type f -exec sed -i 's/Include="MessageHookService"/Include="MessageHook.Orchestration"/g' {} +
 ```
 
 ## Example Migration
@@ -115,10 +115,10 @@ find . -name "*.csproj" -type f -exec sed -i 's/Include="FlowSyncService"/Includ
 ### Before (v1.x)
 
 ```csharp
-using FlowSync.Kafka.Extensions;
-using FlowSyncService.Configurations;
-using FlowSyncService.Factories;
-using FlowSyncService.Host;
+using MessageHook.Kafka.Extensions;
+using MessageHookService.Configurations;
+using MessageHookService.Factories;
+using MessageHookService.Host;
 
 public class GeneralTests
 {
@@ -128,14 +128,14 @@ public class GeneralTests
     {
         var services = new ServiceCollection();
         
-        services.AddKafkaFlowSync(builder =>
+        services.AddKafkaMessageHook(builder =>
         {
             // Kafka configuration
         });
         
-        var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-        var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(
-            new FlowSyncConfiguration()
+        var MessageHookFactory = _provider.GetRequiredService<IMessageHookFactory>();
+        var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(
+            new MessageHookConfiguration()
             {
                 // Configuration
             });
@@ -146,10 +146,10 @@ public class GeneralTests
 ### After (v2.0)
 
 ```csharp
-using FlowSync.Kafka.Extensions;
-using FlowSync.Orchestration.Configurations;
-using FlowSync.Orchestration.Factories;
-using FlowSync.Orchestration.Host;
+using MessageHook.Kafka.Extensions;
+using MessageHook.Orchestration.Configurations;
+using MessageHook.Orchestration.Factories;
+using MessageHook.Orchestration.Host;
 
 public class GeneralTests
 {
@@ -159,14 +159,14 @@ public class GeneralTests
     {
         var services = new ServiceCollection();
         
-        services.AddKafkaFlowSync(builder =>
+        services.AddKafkaMessageHook(builder =>
         {
             // Kafka configuration (unchanged)
         });
         
-        var FlowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-        var FlowSyncStep = await FlowSyncFactory.CreateFlowSyncStepAsync(
-            new FlowSyncConfiguration()
+        var MessageHookFactory = _provider.GetRequiredService<IMessageHookFactory>();
+        var MessageHookStep = await MessageHookFactory.CreateMessageHookStepAsync(
+            new MessageHookConfiguration()
             {
                 // Configuration (unchanged)
             });
@@ -178,30 +178,30 @@ public class GeneralTests
 
 ### API Surface
 All public APIs remain the same:
-- `IFlowSyncFactory`
-- `IFlowSyncStep`
-- `FlowSyncConfiguration`
+- `IMessageHookFactory`
+- `IMessageHookStep`
+- `MessageHookConfiguration`
 - `ConsumingOptionsConfiguration`
-- Extension methods like `AddFlowSyncService()`
+- Extension methods like `AddMessageHookService()`
 
 ### Functionality
 All functionality is identical - this is purely a naming/organizational change.
 
 ### Dependencies
-FlowSync.Orchestration still depends on:
-- `FlowSync.Core`
+MessageHook.Orchestration still depends on:
+- `MessageHook.Core`
 - Other dependencies remain unchanged
 
 ## Troubleshooting
 
-### Build Error: "The type or namespace name 'FlowSyncService' could not be found"
-**Solution**: Update all using statements from `FlowSyncService.*` to `FlowSync.Orchestration.*`
+### Build Error: "The type or namespace name 'MessageHookService' could not be found"
+**Solution**: Update all using statements from `MessageHookService.*` to `MessageHook.Orchestration.*`
 
-### Build Error: "The referenced project '../FlowSyncService/FlowSyncService.csproj' does not exist"
-**Solution**: Update project references in your `.csproj` files to point to `FlowSync.Orchestration.csproj`
+### Build Error: "The referenced project '../MessageHookService/MessageHookService.csproj' does not exist"
+**Solution**: Update project references in your `.csproj` files to point to `MessageHook.Orchestration.csproj`
 
-### NuGet Restore Error: "Package 'FlowSyncService' not found"
-**Solution**: Update package reference to `FlowSync.Orchestration` version 2.0.0
+### NuGet Restore Error: "Package 'MessageHookService' not found"
+**Solution**: Update package reference to `MessageHook.Orchestration` version 2.0.0
 
 ## Need Help?
 
@@ -215,8 +215,8 @@ If you encounter issues during migration:
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| 2.0.0+ | ✅ Current | New name: FlowSync.Orchestration |
-| 1.x.x | ⚠️ Deprecated | Old name: FlowSyncService |
+| 2.0.0+ | ✅ Current | New name: MessageHook.Orchestration |
+| 1.x.x | ⚠️ Deprecated | Old name: MessageHookService |
 
 ---
 
