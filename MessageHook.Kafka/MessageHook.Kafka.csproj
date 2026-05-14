@@ -11,12 +11,12 @@
         <Authors>MessageHook Framework Team</Authors>
         <Description>Kafka integration for MessageHook — the integration testing framework for Kafka message flows</Description>
         <PackageIcon>icon.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
-
-
 
     <ItemGroup>
       <None Include="..\icon.png" Pack="true" PackagePath="\" />
+      <None Include="README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>
