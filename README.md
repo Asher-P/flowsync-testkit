@@ -349,10 +349,9 @@ public async Task DeleteConsumerGroupAsync()
     
     var adminClient = new AdminClientBuilder(adminClientConfig).Build();
 
-    // Stop kafka bus and delete consumer groups
     await kafkaBus.StopAsync();
-    
-   
+    while (true)
+    {
         try
         {
             await adminClient.DeleteGroupsAsync(new List<string>()
@@ -363,10 +362,12 @@ public async Task DeleteConsumerGroupAsync()
         }
         catch (DeleteGroupsException e)
         {
+            if (e.Message.Contains("The group id does not exist"))
+                return;
             Console.WriteLine(e);
-            await Task.Delay(1000); // Wait before retry
+            await Task.Delay(1000);
         }
-    
+    }
 }
 ```
 
@@ -543,7 +544,6 @@ Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(messages)); // Log r
 Required NuGet packages:
 - `MessageHook.Core`
 - `MessageHook.Kafka`
-Dependecies
 - `KafkaFlow`
 - `Confluent.Kafka`
 
