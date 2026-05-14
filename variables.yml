@@ -1,0 +1,8 @@
+variables:
+  nugetconfig: './nuget/nuget.config'
+  solution: './FlowSync.sln'
+  releaseconfig: 'Release'
+  prereleaseconfig: 'Debug'
+  feedname: 'DataIntegrityInfra/DIGeneralFeed'
+  packlocation: './**'
+  versionconfig: './versionconfig.yml'

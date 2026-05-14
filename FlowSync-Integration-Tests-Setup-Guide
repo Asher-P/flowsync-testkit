@@ -1,0 +1,1300 @@
+# Journey Framework Integration Tests Setup Guide
+
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Prerequisites: Verify NuGet Configuration](#prerequisites-verify-nuget-configuration)
+3. [Step 1: Create NUnit Test Project](#step-1-create-nunit-test-project)
+4. [Step 2: Install NuGet Packages](#step-2-install-nuget-packages)
+5. [Step 3: Configure Kafka Settings](#step-3-configure-kafka-settings)
+6. [Step 4: Create Configuration Models](#step-4-create-configuration-models)
+7. [Step 5: Setup IoC Helper](#step-5-setup-ioc-helper)
+8. [Step 6: Create Infrastructure Helpers](#step-6-create-infrastructure-helpers)
+9. [Step 7: Create Test Base Class](#step-7-create-test-base-class)
+10. [Step 8: Write Your First Test](#step-8-write-your-first-test)
+11. [Best Practices](#best-practices)
+12. [Troubleshooting](#troubleshooting)
+
+---
+
+## Introduction
+
+**Journey Framework** is a testing framework designed for Kafka-based integration testing. It provides:
+
+- **End-to-End Message Flow Testing**: Produce messages to Kafka topics and consume the results
+- **Journey Pattern**: Track message flow through multiple services/topics
+- **Correlation Support**: Automatic correlation ID management for distributed tracing
+- **Easy Setup**: Minimal configuration required to get started
+
+This guide will walk you through setting up integration tests for a Kafka-based service using Journey Framework.
+
+---
+
+## Prerequisites: Verify NuGet Configuration
+
+**⚠️ IMPORTANT: Before proceeding, verify that your `nuget.config` includes the required Azure DevOps feeds with proper authentication.**
+
+### Required Package Sources
+
+Journey Framework packages (Journey.Kafka, which includes Journey.Orchestration) are hosted on Azure DevOps feeds. Your `nuget.config` must include:
+
+**Minimum Required Feed:**
+- **DIGeneralFeed**: `https://pkgs.dev.azure.com/lsportsltd/DataIntegrityInfra/_packaging/DIGeneralFeed/nuget/v3/index.json`
+
+**Recommended Full Configuration:**
+
+Create or verify `nuget.config` in your solution root or test project directory:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+    <add key="DIGeneralFeed" value="https://pkgs.dev.azure.com/lsportsltd/DataIntegrityInfra/_packaging/DIGeneralFeed/nuget/v3/index.json" />
+    <!-- Add other LSports feeds as needed -->
+    <add key="AutomationFeed" value="https://pkgs.dev.azure.com/lsportsltd/_packaging/AutomationFeed/nuget/v3/index.json" />
+    <add key="InfrastructureFeed" value="https://pkgs.dev.azure.com/lsportsltd/Infrastructure/_packaging/InfrastructureFeed/nuget/v3/index.json" />
+    <add key="DataIntegrityInfraFeed" value="https://pkgs.dev.azure.com/lsportsltd/DataIntegrityInfra/_packaging/DataIntegrityInfraFeed/nuget/v3/index.json" />
+  </packageSources>
+</configuration>
+```
+
+### Authentication Setup
+
+Azure DevOps feeds require authentication. Choose one of the following methods:
+
+#### Option 1: Configure Feed Credentials with PAT (Recommended)
+
+If you have a Personal Access Token (PAT):
+
+```bash
+# Update each feed with credentials
+dotnet nuget update source DIGeneralFeed \
+  --username az \
+  --password YOUR_AZURE_DEVOPS_PAT \
+  --store-password-in-clear-text
+
+# Repeat for other feeds as needed
+dotnet nuget update source AutomationFeed \
+  --username az \
+  --password YOUR_AZURE_DEVOPS_PAT \
+  --store-password-in-clear-text
+```
+
+#### Option 2: Use Azure Artifacts Credential Provider
+
+Install and configure the Azure Artifacts Credential Provider:
+
+```bash
+# Install the credential provider
+wget -qO- https://aka.ms/install-artifacts-credprovider.sh | bash
+
+# Or on Windows (PowerShell):
+iex "& { $(irm https://aka.ms/install-artifacts-credprovider.ps1) }"
+
+# Then restore with interactive login
+dotnet restore --interactive
+```
+
+#### Option 3: Manual packageSourceCredentials in nuget.config
+
+Add credentials directly to `nuget.config` (⚠️ **Not recommended for committed files**):
+
+```xml
+<configuration>
+  <packageSources>
+    <!-- package sources here -->
+  </packageSources>
+  
+  <packageSourceCredentials>
+    <DIGeneralFeed>
+      <add key="Username" value="az" />
+      <add key="ClearTextPassword" value="YOUR_AZURE_DEVOPS_PAT" />
+    </DIGeneralFeed>
+  </packageSourceCredentials>
+</configuration>
+```
+
+### Verify Authentication
+
+Test that you can access the feeds:
+
+```bash
+# Try to search for Journey Framework packages
+dotnet package search Journey.Kafka --source DIGeneralFeed
+```
+
+If successful, you should see package results. If you get a **401 Unauthorized** error, your authentication is not configured correctly.
+
+### Common Authentication Issues
+
+**Issue: 401 Unauthorized**
+- Solution: Verify your PAT has "Packaging (Read)" permissions
+- Solution: Check that PAT hasn't expired
+- Solution: Ensure you're using the correct feed URL
+
+**Issue: Package source not found**
+- Solution: Verify the feed URL is correct
+- Solution: Check your network can access pkgs.dev.azure.com
+
+**Issue: Credentials not persisting**
+- Solution: Use `--store-password-in-clear-text` flag (or configure credential provider)
+
+---
+
+**✅ Checkpoint: Before proceeding to Step 1, ensure:**
+1. ✅ `nuget.config` includes DIGeneralFeed source
+2. ✅ Authentication is configured (PAT or credential provider)
+3. ✅ You can successfully search for packages from the feed
+
+---
+
+## Step 1: Create NUnit Test Project
+
+Create a new NUnit test project for your integration tests:
+
+```bash
+dotnet new nunit -n YourService.IntegrationTests
+```
+
+**Project Structure Recommendation:**
+```
+YourService.IntegrationTests/
+├── Constants/
+├── Extensions/
+├── Helpers/
+├── Tests/
+├── appsettings.json
+└── YourService.IntegrationTests.csproj
+```
+
+---
+
+## Step 2: Install NuGet Packages
+
+Add the required NuGet packages to your test project:
+
+```bash
+dotnet add package Journey.Kafka
+dotnet add package KafkaFlow
+dotnet add package KafkaFlow.Serializer
+dotnet add package Confluent.Kafka
+dotnet add package Microsoft.Extensions.Configuration
+dotnet add package Microsoft.Extensions.Configuration.Json
+dotnet add package Microsoft.Extensions.Configuration.EnvironmentVariables
+dotnet add package Steeltoe.Extensions.Configuration.PlaceholderCore
+dotnet add package NUnit
+dotnet add package NUnit3TestAdapter
+```
+
+**Why these packages?**
+- `Journey.Kafka`: Core Journey Framework (includes Journey.Orchestration as dependency)
+- `KafkaFlow`: Kafka client abstraction
+- `Confluent.Kafka`: Low-level Kafka operations (admin client for cleanup)
+- `Microsoft.Extensions.Configuration.*`: Configuration management
+- `Steeltoe.Extensions.Configuration.PlaceholderCore`: Environment variable placeholders
+
+**Note:** Journey.Orchestration is the new name for what was previously called journey. It's automatically included when you install Journey.Kafka.
+
+---
+
+## Step 3: Configure Kafka Settings
+
+Create `appsettings.json` in your test project root:
+
+```json
+{
+  "Environment": "YourServiceIntegrationTest",
+  "TestEnvironment": "Local",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "KafkaFlow": "Information"
+    }
+  },
+  "Serilog": {
+    "Using": ["Serilog.Sinks.Console"],
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "System.Net.Http.HttpClient": "Warning",
+        "Microsoft.AspNetCore": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console"
+      }
+    ]
+  },
+  "KafkaBrokerConfiguration": {
+    "BootstrapServers": [
+      "${SECRET_MESSAGE_BROKER_KAFKA_BOOTSTRAP_BROKER_TLS}"
+    ],
+    "Credentials": {
+      "Username": "${SECRET_MESSAGE_BROKER_KAFKA_SASL_USERNAME}",
+      "Password": "${SECRET_MESSAGE_BROKER_KAFKA_SASL_PASSWORD}",
+      "Mechanism": "${MESSAGE_BROKER_KAFKA_SASL_MECHANISM?plain}",
+      "TlsEnabled": "true",
+      "SecurityProtocol": "SaslSsl"
+    }
+  }
+}
+```
+
+**Important Configuration Notes:**
+
+1. **Placeholder Variables**: The `${...}` syntax uses Steeltoe's placeholder resolution to read from environment variables
+2. **Default Values**: The `?` syntax provides defaults (e.g., `${MESSAGE_BROKER_KAFKA_SASL_MECHANISM?plain}`)
+3. **Security**: Never commit actual credentials to source control - use environment variables
+
+**Customize for your project:**
+- Update `BootstrapServers` placeholder to match your Kafka broker environment variable
+- Adjust `SecurityProtocol` based on your Kafka cluster (SaslSsl, Ssl, Plaintext, etc.)
+- Set appropriate SASL mechanism (plain, scram-sha-256, etc.)
+
+Set the file to **Copy to Output Directory**:
+
+```xml
+<ItemGroup>
+  <None Update="appsettings.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+</ItemGroup>
+```
+
+---
+
+## Step 4: Create Configuration Models
+
+Create classes to deserialize Kafka configuration. These models should match your `appsettings.json` structure.
+
+**Create `Models/KafkaBrokerConfiguration.cs`:**
+
+```csharp
+namespace YourService.IntegrationTests.Models;
+
+public class KafkaBrokerConfiguration
+{
+    public string[] BootstrapServers { get; set; } = Array.Empty<string>();
+    public KafkaCredentials Credentials { get; set; } = new();
+    
+    public bool HasCredentials => 
+        !string.IsNullOrEmpty(Credentials?.Username) && 
+        !string.IsNullOrEmpty(Credentials?.Password);
+}
+
+public class KafkaCredentials
+{
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string Mechanism { get; set; } = "plain";
+    public string SecurityProtocol { get; set; } = "SaslSsl";
+    public string TlsEnabled { get; set; } = "true";
+}
+```
+
+**Why these models?**
+- Provides strongly-typed access to configuration
+- Makes it easy to pass configuration to Kafka clients
+- Enables validation of required configuration values
+
+---
+
+## Step 5: Setup IoC Helper
+
+Create `Extensions/IoCHelper.cs` to initialize the dependency injection container and configure Journey Framework:
+
+```csharp
+using Journey.Kafka.Configurations;
+using Journey.Kafka.Extensions;
+using Journey.Kafka.Serializers;
+using Journey.Orchestration.Configurations;
+using Journey.Orchestration.Entities.Interfaces;
+using Journey.Orchestration.Factories;
+using Journey.Orchestration.Host;
+using KafkaFlow.Serializer;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Steeltoe.Extensions.Configuration.Placeholder;
+using YourService.IntegrationTests.Constants;
+using YourService.IntegrationTests.Models;
+
+namespace YourService.IntegrationTests.Extensions;
+
+public static class IoCHelper
+{
+    public static (ServiceProvider, IConfigurationRoot) InitServiceProvider()
+    {
+        var services = new ServiceCollection();
+
+        // Build configuration with placeholder support
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .AddPlaceholderResolver()  // Enables ${...} placeholder resolution
+            .Build();
+
+        // Register core services
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+        
+        // Register Journey Framework
+        services.AddJourneyOrchestration();
+        services.ConfigureKafkaJourney(configuration);
+        
+        var serviceProvider = services.BuildServiceProvider();
+        return (serviceProvider, configuration);
+    }
+    
+    private static IServiceCollection ConfigureKafkaJourney(
+        this IServiceCollection services,
+        IConfigurationRoot configuration)
+    {
+        services.AddKafkaJourney(builder =>
+        {
+            // Get Kafka configuration
+            var kafkaBrokerConfig = configuration
+                .GetSection("KafkaBrokerConfiguration")
+                .Get<KafkaBrokerConfiguration>();
+
+            // Configure broker connection
+            var kafkaConfigurationBuilder = builder.ConfigureBroker(brokerBuilder =>
+            {
+                brokerBuilder
+                    .WithBootstrapServers(kafkaBrokerConfig.BootstrapServers)
+                    .WithCredentials(kafkaBrokerConfig.Credentials);
+            });
+
+            // ========================================
+            // CONFIGURE CONSUMERS (Output Topics)
+            // ========================================
+            // Add consumers for each output topic you want to test
+            
+            kafkaConfigurationBuilder.AddConsumer(consumerBuilder =>
+            {
+                consumerBuilder
+                    .AddTopic(TestConstants.OUTPUT_TOPIC_1)  // Topic to consume from
+                    .AddConsumerGroup(TestConstants.CONSUMER_GROUP)
+                    .AddConsumingSerializer(new JsonCoreSerializer())  // or KafkaUTF8Serializer
+                    .AddConsumingType(typeof(YourOutputDto))  // DTO type to deserialize
+                    .SetWorkersCount(1)
+                    .SetBufferSize(10);
+            });
+            
+            // Add more consumers for additional output topics
+            kafkaConfigurationBuilder.AddConsumer(consumerBuilder =>
+            {
+                consumerBuilder
+                    .AddTopic(TestConstants.OUTPUT_TOPIC_2)
+                    .AddConsumerGroup(TestConstants.CONSUMER_GROUP)
+                    .AddConsumingSerializer(new JsonCoreSerializer())
+                    .AddConsumingType(typeof(AnotherOutputDto))
+                    .SetWorkersCount(1)
+                    .SetBufferSize(10);
+            });
+
+            // ========================================
+            // CONFIGURE PRODUCERS (Input Topics)
+            // ========================================
+            // Add producers for each input topic you want to produce to
+            
+            kafkaConfigurationBuilder.AddProducer(producerBuilder =>
+            {
+                producerBuilder
+                    .AddProducerTopic(TestConstants.INPUT_TOPIC)  // Topic to produce to
+                    .AddProducerSerializer(new JsonCoreSerializer());
+            });
+        });
+        
+        return services;
+    }
+    
+    /// <summary>
+    /// Helper method to create a Journey Step for testing
+    /// </summary>
+    public static async Task<IJourneyStep> CreateJourneyStep(
+        this IServiceProvider serviceProvider, 
+        string outputTopic,
+        int timeoutSeconds = 30,
+        int expectedMessageCount = 1)
+    {
+        var journeyFactory = serviceProvider.GetRequiredService<IJourneyFactory>();
+
+        return await journeyFactory.CreateJourneyStepAsync(new JourneyConfiguration
+        {
+            ProduceTo = TestConstants.INPUT_TOPIC,
+            ConsumeFrom = new[] { outputTopic },
+            ConsumingOptions = new ConsumingOptionsConfiguration
+            {
+                TimeOut = TimeSpan.FromSeconds(timeoutSeconds),
+                MsgReceivedCount = expectedMessageCount,
+            }
+        });
+    }
+}
+```
+
+**Key Configuration Points:**
+
+1. **Consumers**: Configure for topics your service produces to (output topics)
+2. **Producers**: Configure for topics your service consumes from (input topics)
+3. **Serializers**: Use `JsonCoreSerializer` for JSON or `KafkaUTF8Serializer` for UTF-8 strings
+4. **Consumer Group**: Use a unique group name for your tests to avoid conflicts
+
+**Customization Required:**
+- Replace `TestConstants.OUTPUT_TOPIC_1`, `TestConstants.INPUT_TOPIC` with your actual topic names
+- Replace `YourOutputDto`, `AnotherOutputDto` with your actual DTO types
+- Adjust serializers based on your message format
+
+**Note on Namespaces:**
+- `Journey.Orchestration.*` namespaces are the new naming (previously `journey.*`)
+- If you're using an older version of Journey.Kafka, you may still see `journey.*` namespaces
+
+---
+
+## Step 6: Create Infrastructure Helpers
+
+### Create Constants File
+
+**Create `Constants/TestConstants.cs`:**
+
+```csharp
+namespace YourService.IntegrationTests.Constants;
+
+public static class TestConstants
+{
+    // ========================================
+    // TOPIC NAMES
+    // ========================================
+    // Input topic (where you produce test messages)
+    public const string INPUT_TOPIC = "YourService.Input";
+    
+    // Output topics (where you consume processed results)
+    public const string OUTPUT_TOPIC_1 = "YourService.Output.Success";
+    public const string OUTPUT_TOPIC_2 = "YourService.Output.Failed";
+    
+    // ========================================
+    // CONSUMER CONFIGURATION
+    // ========================================
+    // Use unique consumer group for your test project
+    public const string CONSUMER_GROUP = "your-service.integration-tests";
+    
+    // ========================================
+    // TEST CONFIGURATION
+    // ========================================
+    public const int DEFAULT_TIMEOUT_SECONDS = 30;
+    public const int DEFAULT_MESSAGE_COUNT = 1;
+    public const int DEFAULT_WORKERS = 1;
+}
+```
+
+### Create Kafka Helper for Cleanup
+
+**Create `Helpers/KafkaHelper.cs`:**
+
+```csharp
+using Confluent.Kafka;
+using Confluent.Kafka.Admin;
+using KafkaFlow;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using YourService.IntegrationTests.Constants;
+using YourService.IntegrationTests.Models;
+
+namespace YourService.IntegrationTests.Helpers;
+
+public static class KafkaHelper
+{
+    /// <summary>
+    /// Stops all consumers and deletes the consumer group from Kafka.
+    /// This prevents test interference and ensures clean state between test runs.
+    /// </summary>
+    public static async Task DeleteConsumerGroupAsync(
+        IServiceProvider provider, 
+        IConfiguration configuration)
+    {
+        // Step 1: Stop all KafkaFlow consumers
+        var kafkaBus = provider.GetRequiredService<IKafkaBus>();
+        foreach (var messageConsumer in kafkaBus.Consumers.All)
+        {
+            await messageConsumer.StopAsync();
+        }
+        
+        // Wait for consumers to fully stop
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        
+        // Step 2: Get Kafka broker configuration
+        var kafkaBrokerConfig = configuration
+            .GetSection("KafkaBrokerConfiguration")
+            .Get<KafkaBrokerConfiguration>();
+        
+        // Step 3: Configure admin client with security settings
+        var adminClientConfig = new AdminClientConfig
+        {
+            BootstrapServers = string.Join(",", kafkaBrokerConfig.BootstrapServers),
+        };
+        
+        // Set security protocol if configured
+        if (Enum.TryParse<SecurityProtocol>(
+            kafkaBrokerConfig.Credentials.SecurityProtocol, 
+            true, 
+            out var securityProtocol))
+        {
+            adminClientConfig.SecurityProtocol = securityProtocol;
+        }
+        
+        // Set SASL credentials if available
+        if (kafkaBrokerConfig.HasCredentials)
+        {
+            adminClientConfig.SaslUsername = kafkaBrokerConfig.Credentials.Username;
+            adminClientConfig.SaslPassword = kafkaBrokerConfig.Credentials.Password;
+            
+            if (Enum.TryParse<SaslMechanism>(
+                kafkaBrokerConfig.Credentials.Mechanism, 
+                true, 
+                out var saslMechanism))
+            {
+                adminClientConfig.SaslMechanism = saslMechanism;
+            }
+        }
+        
+        // Step 4: Delete the consumer group
+        using var adminClient = new AdminClientBuilder(adminClientConfig).Build();
+        
+        try
+        {
+            await kafkaBus.StopAsync();
+            
+            await adminClient.DeleteGroupsAsync(new List<string>
+            {
+                TestConstants.CONSUMER_GROUP
+            });
+            
+            Console.WriteLine($"Deleted consumer group: {TestConstants.CONSUMER_GROUP}");
+        }
+        catch (DeleteGroupsException ex)
+        {
+            // Ignore if group doesn't exist
+            if (ex.Message.Contains("The group id does not exist"))
+            {
+                Console.WriteLine($"Consumer group {TestConstants.CONSUMER_GROUP} does not exist");
+                return;
+            }
+            
+            Console.WriteLine($"Error deleting consumer group: {ex.Message}");
+            throw;
+        }
+    }
+}
+```
+
+**Why Consumer Group Cleanup is Critical:**
+- Prevents offset commit conflicts between test runs
+- Ensures tests start with clean state
+- Avoids "stuck" consumer groups that can cause test failures
+- Required for idempotent test execution
+
+---
+
+## Step 7: Create Test Base Class
+
+Create an abstract test base class that handles Journey Framework setup and cleanup:
+
+**Create `Tests/IntegrationTestBase.cs`:**
+
+```csharp
+using Confluent.Kafka;
+using Confluent.Kafka.Admin;
+using KafkaFlow;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NUnit.Framework;
+using YourService.IntegrationTests.Constants;
+using YourService.IntegrationTests.Extensions;
+using YourService.IntegrationTests.Models;
+
+namespace YourService.IntegrationTests.Tests;
+
+/// <summary>
+/// Base class for all integration tests.
+/// Handles Journey Framework initialization and Kafka consumer group cleanup.
+/// </summary>
+public abstract class IntegrationTestBase
+{
+    protected IConfigurationRoot Configuration { get; private set; }
+    protected IServiceProvider ServiceProvider { get; private set; }
+    
+    /// <summary>
+    /// Runs once before all tests in the test class.
+    /// Initializes Journey Framework and cleans up consumer groups.
+    /// </summary>
+    [OneTimeSetUp]
+    public async Task OneTimeSetUp()
+    {
+        await Setupjourney();
+        await CleanupConsumerGroups();
+    }
+    
+    /// <summary>
+    /// Initialize the service provider and configuration
+    /// </summary>
+    private Task Setupjourney()
+    {
+        Console.WriteLine("Setting up Journey Framework...");
+        var (serviceProvider, configuration) = IoCHelper.InitServiceProvider();
+        ServiceProvider = serviceProvider;
+        Configuration = configuration;
+        Console.WriteLine("Journey Framework setup completed");
+        return Task.CompletedTask;
+    }
+    
+    /// <summary>
+    /// Clean up consumer groups before tests run.
+    /// This ensures tests start with a clean state.
+    /// </summary>
+    private async Task CleanupConsumerGroups()
+    {
+        try
+        {
+            // Stop all consumers
+            var kafkaBus = ServiceProvider?.GetRequiredService<IKafkaBus>();
+            if (kafkaBus != null)
+            {
+                foreach (var consumer in kafkaBus.Consumers.All)
+                {
+                    await consumer.StopAsync();
+                }
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                Console.WriteLine("Consumers stopped successfully");
+            }
+
+            // Delete consumer groups from Kafka
+            await DeleteConsumerGroupsFromKafka();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Could not cleanup consumer groups: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Delete the test consumer group from Kafka broker
+    /// </summary>
+    private async Task DeleteConsumerGroupsFromKafka()
+    {
+        try
+        {
+            var kafkaConfig = Configuration.GetSection("KafkaBrokerConfiguration");
+            var bootstrapServers = kafkaConfig.GetSection("BootstrapServers").Get<string[]>();
+            
+            var adminConfig = new AdminClientConfig
+            {
+                BootstrapServers = string.Join(",", bootstrapServers)
+            };
+
+            // Add credentials if they exist (for non-local environments)
+            var credentials = kafkaConfig.GetSection("Credentials");
+            if (credentials.Exists() && !string.IsNullOrEmpty(credentials["Username"]))
+            {
+                adminConfig.SecurityProtocol = SecurityProtocol.SaslSsl;
+                adminConfig.SaslMechanism = SaslMechanism.Plain;
+                adminConfig.SaslUsername = credentials["Username"];
+                adminConfig.SaslPassword = credentials["Password"];
+            }
+
+            using var adminClient = new AdminClientBuilder(adminConfig).Build();
+            
+            // Delete the consumer group
+            var groupsToDelete = new[] { TestConstants.CONSUMER_GROUP };
+            await adminClient.DeleteGroupsAsync(groupsToDelete);
+            
+            Console.WriteLine($"Deleted consumer groups: {string.Join(", ", groupsToDelete)}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Could not delete consumer groups: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Runs once after all tests in the test class.
+    /// Cleans up resources and disposes the service provider.
+    /// </summary>
+    [OneTimeTearDown]
+    public async Task OneTimeTearDown()
+    {
+        await CleanupConsumerGroups();
+        
+        if (ServiceProvider is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+        
+        Console.WriteLine("Journey Framework cleanup completed");
+    }
+}
+```
+
+**Key Methods:**
+
+1. **OneTimeSetUp**: Runs once before all tests - initializes Journey Framework
+2. **CleanupConsumerGroups**: Ensures clean state by removing old consumer groups
+3. **OneTimeTearDown**: Runs once after all tests - cleans up resources
+
+---
+
+## Step 8: Write Your First Test
+
+Create a test class that inherits from the base class:
+
+**Create `Tests/HappyPathTests.cs`:**
+
+```csharp
+using Journey.Core.Messaging.Publishing.Entities;
+using Journey.Orchestration.Configurations;
+using Journey.Orchestration.Factories;
+using Microsoft.Extensions.DependencyInjection;
+using NUnit.Framework;
+using YourService.IntegrationTests.Constants;
+using YourService.IntegrationTests.Extensions;
+
+namespace YourService.IntegrationTests.Tests;
+
+/// <summary>
+/// Happy path integration tests for your service
+/// </summary>
+public class HappyPathTests : IntegrationTestBase
+{
+    [Test, Category("P0")]
+    public async Task Should_Process_Message_Successfully()
+    {
+        try
+        {
+            // ========================================
+            // ARRANGE - Setup test data
+            // ========================================
+            
+            // Create your input message
+            var inputMessage = new YourInputDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Message",
+                Timestamp = DateTime.UtcNow
+            };
+            
+            // Get the journey factory from DI
+            var journeyFactory = ServiceProvider.GetRequiredService<IJourneyFactory>();
+            
+            // ========================================
+            // CONFIGURE JOURNEY
+            // ========================================
+            
+            // Create a journey step that:
+            // 1. Produces to INPUT_TOPIC
+            // 2. Consumes from OUTPUT_TOPIC_1
+            // 3. Waits up to 30 seconds for 1 message
+            var journey = await journeyFactory.CreateJourneyStepAsync(
+                new JourneyConfiguration
+                {
+                    ProduceTo = TestConstants.INPUT_TOPIC,
+                    ConsumeFrom = new[] { TestConstants.OUTPUT_TOPIC_1 },
+                    ConsumingOptions = new ConsumingOptionsConfiguration
+                    {
+                        TimeOut = TimeSpan.FromSeconds(30),
+                        MsgReceivedCount = 1,
+                    }
+                });
+            
+            // Small delay to ensure consumers are ready
+            await Task.Delay(1000);
+            
+            // ========================================
+            // ACT - Execute the journey
+            // ========================================
+            
+            // Create message key (customize based on your partitioning strategy)
+            var messageKey = $"{inputMessage.Id}";
+            
+            // Execute the journey - this will:
+            // 1. Produce your message to INPUT_TOPIC
+            // 2. Wait for response on OUTPUT_TOPIC_1
+            // 3. Return the consumed messages
+            // Note: Journey Framework automatically adds correlation_id to headers
+            var waitForMessagesTask = await journey.ExecuteAsync(
+                messageKey,
+                inputMessage,
+                new ProducingExtraData
+                {
+                    Headers = new Dictionary<string, string>
+                    {
+                        {"source", "integration-test"}
+                    }
+                });
+
+            // Wait for the messages to be consumed
+            var messages = await waitForMessagesTask.Task;
+
+            // ========================================
+            // ASSERT - Validate results
+            // ========================================
+            
+            // Extract your output messages from the response
+            var outputMessages = messages
+                .SelectMany(r => r.Messages)
+                .Where(mc => mc.Value is YourOutputDto)
+                .Select(mc => (YourOutputDto)mc.Value)
+                .ToList();
+            
+            // Validate that we received messages
+            Assert.IsNotEmpty(outputMessages, "Should receive at least one output message");
+            
+            // Validate the output content
+            var outputMessage = outputMessages.First();
+            Assert.AreEqual(inputMessage.Id, outputMessage.Id, "Output ID should match input ID");
+            Assert.IsNotNull(outputMessage.ProcessedAt, "ProcessedAt timestamp should be set");
+            
+            Console.WriteLine($"✅ Successfully processed message {inputMessage.Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Test failed: {ex.Message}");
+            throw;
+        }
+    }
+    
+    [Test, Category("P1")]
+    public async Task Should_Handle_Invalid_Message_Gracefully()
+    {
+        try
+        {
+            // ========================================
+            // ARRANGE
+            // ========================================
+            
+            // Create an invalid input message
+            var invalidMessage = new YourInputDto
+            {
+                Id = Guid.Empty,  // Invalid ID
+                Name = null,      // Missing required field
+            };
+            
+            var journeyFactory = ServiceProvider.GetRequiredService<IJourneyFactory>();
+            
+            // Configure journey to expect message on error topic
+            var journey = await journeyFactory.CreateJourneyStepAsync(
+                new JourneyConfiguration
+                {
+                    ProduceTo = TestConstants.INPUT_TOPIC,
+                    ConsumeFrom = new[] { TestConstants.OUTPUT_TOPIC_2 },  // Error topic
+                    ConsumingOptions = new ConsumingOptionsConfiguration
+                    {
+                        TimeOut = TimeSpan.FromSeconds(30),
+                        MsgReceivedCount = 1,
+                    }
+                });
+            
+            await Task.Delay(1000);
+            
+            // ========================================
+            // ACT
+            // ========================================
+            
+            var messageKey = "invalid-message";
+            var waitForMessagesTask = await journey.ExecuteAsync(
+                messageKey,
+                invalidMessage);
+
+            var messages = await waitForMessagesTask.Task;
+
+            // ========================================
+            // ASSERT
+            // ========================================
+            
+            var errorMessages = messages
+                .SelectMany(r => r.Messages)
+                .Where(mc => mc.Value is YourErrorDto)
+                .Select(mc => (YourErrorDto)mc.Value)
+                .ToList();
+            
+            Assert.IsNotEmpty(errorMessages, "Should receive error message");
+            
+            var errorMessage = errorMessages.First();
+            Assert.IsNotNull(errorMessage.ErrorReason, "Error reason should be provided");
+            
+            Console.WriteLine($"✅ Invalid message handled correctly: {errorMessage.ErrorReason}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Test failed: {ex.Message}");
+            throw;
+        }
+    }
+}
+```
+
+### Understanding the Test Pattern
+
+**1. Journey Configuration:**
+```csharp
+var journey = await journeyFactory.CreateJourneyStepAsync(
+    new JourneyConfiguration
+    {
+        ProduceTo = TestConstants.INPUT_TOPIC,      // Where to send test message
+        ConsumeFrom = new[] { TestConstants.OUTPUT_TOPIC_1 },  // Where to expect response
+        ConsumingOptions = new ConsumingOptionsConfiguration
+        {
+            TimeOut = TimeSpan.FromSeconds(30),     // How long to wait
+            MsgReceivedCount = 1,                   // How many messages to expect
+        }
+    });
+```
+
+**2. Message Execution:**
+```csharp
+// Note: Journey Framework automatically adds correlation_id to headers
+var waitForMessagesTask = await journey.ExecuteAsync(
+    messageKey,      // Kafka message key for partitioning
+    inputMessage,    // Your message payload
+    new ProducingExtraData  // Optional headers (correlation_id is added automatically)
+    {
+        Headers = new Dictionary<string, string>
+        {
+            {"source", "integration-test"}  // Add custom headers as needed
+        }
+    });
+```
+
+**3. Response Handling:**
+```csharp
+var messages = await waitForMessagesTask.Task;
+
+// Extract typed messages from response
+var outputMessages = messages
+    .SelectMany(r => r.Messages)
+    .Where(mc => mc.Value is YourOutputDto)
+    .Select(mc => (YourOutputDto)mc.Value)
+    .ToList();
+```
+
+---
+
+## Best Practices
+
+### 1. Use Unique Consumer Groups
+
+```csharp
+// ✅ Good - Unique per test project
+public const string CONSUMER_GROUP = "your-service.integration-tests";
+
+// ❌ Bad - Generic name might conflict
+public const string CONSUMER_GROUP = "test-group";
+```
+
+### 2. Always Clean Up Consumer Groups
+
+```csharp
+[OneTimeSetUp]
+public async Task OneTimeSetUp()
+{
+    await Setupjourney();
+    await CleanupConsumerGroups();  // Clean before tests
+}
+
+[OneTimeTearDown]
+public async Task OneTimeTearDown()
+{
+    await CleanupConsumerGroups();  // Clean after tests
+}
+```
+
+### 3. Use Test Categories for Prioritization
+
+```csharp
+[Test, Category("P0")]  // Critical path - must always pass
+public async Task Should_Process_Critical_Flow() { }
+
+[Test, Category("P1")]  // Important features
+public async Task Should_Handle_Edge_Case() { }
+
+[Test, Category("P2")]  // Nice to have
+public async Task Should_Support_Optional_Feature() { }
+```
+
+Run specific categories:
+```bash
+dotnet test --filter "Category=P0"
+```
+
+### 4. Set Appropriate Timeouts
+
+```csharp
+// Base timeout on your service SLA
+TimeOut = TimeSpan.FromSeconds(30)  // For fast services
+TimeOut = TimeSpan.FromSeconds(60)  // For slower processing
+TimeOut = TimeSpan.FromMinutes(2)   // For batch operations
+```
+
+### 5. Use Descriptive Test Names
+
+```csharp
+// ✅ Good - Clear what is being tested
+[Test]
+public async Task Should_Process_Valid_Order_Successfully() { }
+
+[Test]
+public async Task Should_Reject_Order_With_Invalid_Customer_Id() { }
+
+// ❌ Bad - Unclear test purpose
+[Test]
+public async Task Test1() { }
+
+[Test]
+public async Task OrderTest() { }
+```
+
+### 6. Add Helpful Console Output
+
+```csharp
+Console.WriteLine($"Processing message {inputMessage.Id}");
+Console.WriteLine($"✅ Successfully processed in {elapsed}ms");
+Console.WriteLine($"❌ Test failed: {ex.Message}");
+```
+
+### 7. Use Extension Methods for Message Extraction
+
+Create reusable helpers in `Extensions/EnumerableExtensions.cs`:
+
+```csharp
+using Journey.Core.Messaging.Models;
+
+namespace YourService.IntegrationTests.Extensions;
+
+public static class EnumerableExtensions
+{
+    public static List<T> ExtractMessages<T>(this IEnumerable<ResponseContainer>? results) 
+        where T : class
+    {
+        if (results == null)
+            return new List<T>();
+        
+        return results
+            .SelectMany(r => r.Messages)
+            .Where(mc => mc.Value is T)
+            .Select(mc => (T)mc.Value)
+            .ToList();
+    }
+}
+```
+
+Usage:
+```csharp
+var outputMessages = messages.ExtractMessages<YourOutputDto>();
+Assert.IsNotEmpty(outputMessages, "Should receive output messages");
+```
+
+### 8. Async/Await Best Practices
+
+```csharp
+// ✅ Good - Properly awaited
+var messages = await waitForMessagesTask.Task;
+
+// ❌ Bad - Blocking async code
+var messages = waitForMessagesTask.Task.Result;  // Can cause deadlocks!
+```
+
+---
+
+## Troubleshooting
+
+### Issue 1: Consumer Group Already Exists Error
+
+**Symptoms:**
+```
+Error: Consumer group 'your-group' is still in use
+```
+
+**Solutions:**
+1. Ensure `CleanupConsumerGroups()` is called in `OneTimeSetUp` and `OneTimeTearDown`
+2. Manually delete the consumer group:
+```bash
+kafka-consumer-groups --bootstrap-server localhost:9092 --delete --group your-group
+```
+3. Use a unique consumer group name per test project
+
+### Issue 2: Timeout Waiting for Messages
+
+**Symptoms:**
+```
+TimeoutException: No messages received within 30 seconds
+```
+
+**Solutions:**
+1. Verify your service is running and processing messages
+2. Check topic names are correct in configuration
+3. Increase timeout if your service is legitimately slow:
+```csharp
+TimeOut = TimeSpan.FromSeconds(60)
+```
+4. Check Kafka broker connectivity
+5. Verify consumer is subscribed to correct topics
+
+### Issue 3: Serialization Errors
+
+**Symptoms:**
+```
+Error: Cannot deserialize message to type YourDto
+```
+
+**Solutions:**
+1. Ensure serializer matches message format:
+```csharp
+// For JSON messages
+.AddConsumingSerializer(new JsonCoreSerializer())
+
+// For UTF-8 string messages
+.AddConsumingSerializer(new KafkaUTF8Serializer())
+```
+2. Verify DTO properties match message structure
+3. Check for missing required properties
+4. Ensure proper JSON serialization attributes if needed
+
+### Issue 4: No Messages Received
+
+**Symptoms:**
+- Test times out without receiving any messages
+- Empty results list
+
+**Solutions:**
+1. Check if message was actually produced:
+```csharp
+Console.WriteLine($"Producing message with key: {messageKey}");
+```
+2. Verify consumer group offsets:
+```bash
+kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group your-group
+```
+3. Ensure topic names match exactly (case-sensitive)
+4. Check if service is actually consuming from input topic
+5. Verify message key routing (partition assignment)
+
+### Issue 5: Connection Refused
+
+**Symptoms:**
+```
+Error: Connection refused to broker
+```
+
+**Solutions:**
+1. Verify Kafka broker is running
+2. Check bootstrap servers configuration
+3. Verify network connectivity to Kafka cluster
+4. Check security credentials are correct
+5. Ensure firewall rules allow connection
+
+### Issue 6: Authentication Failures
+
+**Symptoms:**
+```
+Error: SASL authentication failed
+```
+
+**Solutions:**
+1. Verify credentials are set correctly in environment variables
+2. Check SASL mechanism matches broker configuration
+3. Ensure SecurityProtocol is correct (SaslSsl, Ssl, etc.)
+4. Verify placeholder resolution is working:
+```csharp
+var username = Configuration["KafkaBrokerConfiguration:Credentials:Username"];
+Console.WriteLine($"Using username: {username}");
+```
+
+### Issue 7: Multiple Messages When Expecting One
+
+**Symptoms:**
+- Received more messages than `MsgReceivedCount`
+- Test assertions fail due to extra messages
+
+**Solutions:**
+1. Clean consumer group before test
+2. Use unique message IDs to filter:
+```csharp
+var myMessages = outputMessages.Where(m => m.CorrelationId == testCorrelationId);
+```
+3. Check if previous test runs left messages in topic
+
+---
+
+## Additional Resources
+
+### Example Project Structure
+
+```
+YourService.IntegrationTests/
+├── Constants/
+│   └── TestConstants.cs
+├── Extensions/
+│   ├── IoCHelper.cs
+│   └── EnumerableExtensions.cs
+├── Helpers/
+│   └── KafkaHelper.cs
+├── Models/
+│   ├── KafkaBrokerConfiguration.cs
+│   └── YourDtos.cs
+├── Tests/
+│   ├── IntegrationTestBase.cs
+│   ├── HappyPathTests.cs
+│   └── ErrorHandlingTests.cs
+├── appsettings.json
+└── YourService.IntegrationTests.csproj
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run specific category
+dotnet test --filter "Category=P0"
+
+# Run with verbose output
+dotnet test --logger "console;verbosity=detailed"
+
+# Run specific test
+dotnet test --filter "FullyQualifiedName~Should_Process_Message_Successfully"
+```
+
+### Environment Variables Setup
+
+For local development, create a `.env` file or set environment variables:
+
+```bash
+export SECRET_MESSAGE_BROKER_KAFKA_BOOTSTRAP_BROKER_TLS="localhost:9092"
+export SECRET_MESSAGE_BROKER_KAFKA_SASL_USERNAME="your-username"
+export SECRET_MESSAGE_BROKER_KAFKA_SASL_PASSWORD="your-password"
+export MESSAGE_BROKER_KAFKA_SASL_MECHANISM="plain"
+```
+
+---
+
+## Summary
+
+You now have a complete integration testing setup using Journey Framework! 
+
+**Key Takeaways:**
+1. Journey Framework simplifies Kafka integration testing
+2. Proper consumer group cleanup is critical for reliable tests
+3. Use configuration placeholders for environment-specific settings
+4. Structure your tests with clear Arrange-Act-Assert patterns
+5. Always clean up resources in teardown methods
+
+**Next Steps:**
+1. Create your test DTOs matching your service's messages
+2. Configure your specific Kafka topics in TestConstants
+3. Write tests for your service's happy path
+4. Add error handling tests
+5. Expand to cover edge cases and integration scenarios
+
+Happy testing! 🚀
+

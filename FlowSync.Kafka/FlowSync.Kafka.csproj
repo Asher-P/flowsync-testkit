@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+
+
+    <ItemGroup>
+      <PackageReference Include="KafkaFlow" Version="4.0.0" />
+      <PackageReference Include="KafkaFlow.Extensions.Hosting" Version="4.0.0" />
+      <PackageReference Include="KafkaFlow.Serializer.Json" Version="1.5.8" />
+      <PackageReference Include="protobuf-net" Version="3.2.30" />
+      <PackageReference Include="protobuf-net.Core" Version="3.2.30" />
+      <PackageReference Include="Utf8Json" Version="1.3.7" />
+    </ItemGroup>
+
+
+
+    <ItemGroup>
+      <ProjectReference Include="..\FlowSync.Orchestration\FlowSync.Orchestration.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<root>
+    <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+        <xsd:element name="root" msdata:IsDataSet="true">
+            
+        </xsd:element>
+    </xsd:schema>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>1.3</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+	<data name="BasicUnderOverMarket" xml:space="preserve">
+		<value>{
+	"MarketId": 2,
+	"ProviderId": 70,
+	"CreationDate": "2024-07-21T19:39:44.5889465Z",
+	"LastUpdate": "2024-07-21T19:39:44.5894330Z",
+	"Bets": [
+		{
+			"Id": 21948577322147188,
+			"BetStatus": 1,
+			"Name": "Under",
+			"Line": "2.5",
+			"BaseLine": "2.5",
+			"CurrentPrice": 2.2,
+			"CreationDate": "2024-07-21T19:39:44.5889915Z",
+			"LastUpdate": "2024-07-21T19:39:44.5894330Z",
+			"PlayerName": null,
+			"PlayerId": null,
+			"ParticipantId": null,
+			"ProviderBetId": "1480387825"
+		},
+		{
+			"Id": 21377463522147188,
+			"BetStatus": 1,
+			"Name": "Over",
+			"Line": "2.5",
+			"BaseLine": "2.5",
+			"CurrentPrice": 1.6,
+			"CreationDate": "2024-07-21T19:39:44.5889698Z",
+			"LastUpdate": "2024-07-21T19:39:44.5894330Z",
+			"PlayerName": null,
+			"PlayerId": null,
+			"ParticipantId": null,
+			"ProviderBetId": "1480387824"
+		}
+	],
+	"Market": {
+		"Id": 2,
+		"Name": "Under/Over",
+		"IsActive": true,
+		"ActivePeriod": 100,
+		"SettlementPeriod": 0,
+		"MarketFamilyId": 7,
+		"CoverageLevel": 0,
+		"OppositeId": null,
+		"MarketFamily": {
+			"Id": 7,
+			"Name": "Under/Over",
+			"MarketLogicGroup": 2,
+			"MarketBetGroupId": 1,
+			"MarketPropertiesId": 2,
+			"AutoCompleteMissingBets": true,
+			"MarketBets": [
+				{
+					"Id": 1,
+					"GroupId": 1,
+					"BetName": "Under",
+					"IsMainLine": false,
+					"IsOptional": true,
+					"Order": 1
+				},
+				{
+					"Id": 2,
+					"GroupId": 1,
+					"BetName": "Over",
+					"IsMainLine": true,
+					"IsOptional": true,
+					"Order": 2
+				}
+			],
+			"MarketProperties": {
+				"Id": 2,
+				"SwapEnabled": false,
+				"LineRegexFormat": "^-?\\d+(\\.0|\\.[2|7]?5)?$",
+				"IsWithLine": true,
+				"IsSpecialMarket": false,
+				"BetRegexFormat": null,
+				"LineTypes": [
+					1,
+					2,
+					4
+				],
+				"IsOutright": false,
+				"MarketType": 0
+			}
+		},
+		"IncidentTypeId": 9,
+		"Stage": 10,
+		"Description": "Will the score be under/over a specific line"
+	},
+	"MessageGuid": "15d5137d-6ee1-4b70-848f-1b5015ab2960",
+	"ProcessingGuid": "94fc4921-01f9-4660-aa97-2f6a0b6f72de",
+	"ProviderFixtureId": "14158354",
+	"RobotId": 377,
+	"FixtureDto": {
+		"Id": 22147189,
+		"SportId": 6046,
+		"LeagueId": 42667,
+		"StartDate": "2024-07-21T19:00:00"
+	}
+}</value>
+	</data>
+</root>
