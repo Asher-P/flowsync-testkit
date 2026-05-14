@@ -133,40 +133,6 @@ public class MessageKeyFlowSyncTest
         }
     }
 
-    [Test]
-    public async Task CorrelationIdFlowSyncTest_TraditionalMode()
-    {
-        try
-        {
-            var animal = AnimalFactory.Create("Max");
-
-            var flowSyncFactory = _provider.GetRequiredService<IFlowSyncFactory>();
-            var flowSyncStep = await flowSyncFactory.CreateFlowSyncStepAsync(new FlowSyncConfiguration()
-            {
-                ProduceTo = OutliersConsts.PRODUCER_OUTLIER,
-                ConsumeFrom = new[] { OutliersConsts.CONSUMER_TOPIC },
-                ConsumingOptions = new ConsumingOptionsConfiguration()
-                {
-                    TimeOut = TimeSpan.FromSeconds(30),
-                    MsgReceivedCount = 1,
-                }
-            });
-
-            await flowSyncStep.ExecuteAsync($"{animal.Id}", animal);
-            await Task.Delay(1000);
-            Console.WriteLine("Traditional correlation ID FlowSync test completed");
-        }
-        catch (TimeoutException)
-        {
-            Console.WriteLine("Traditional correlation ID FlowSync timeout - this is expected for this demo");
-        }
-        finally
-        {
-            Console.WriteLine("Clean Up");
-            await DeleteConsumerGroupAsync();
-        }
-    }
-
     public async Task DeleteConsumerGroupAsync()
     {
         var kafkaBus = _provider.GetRequiredService<IKafkaBus>();
