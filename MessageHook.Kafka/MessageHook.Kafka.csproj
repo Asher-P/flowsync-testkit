@@ -9,7 +9,7 @@
         <AssemblyName>MessageHook.Kafka</AssemblyName>
         <RootNamespace>MessageHook.Kafka</RootNamespace>
         <Authors>MessageHook Framework Team</Authors>
-        <Description>Kafka integration for MessageHook — the integration testing framework for Kafka message flows</Description>
+        <Description>Kafka transport layer for MessageHook. Enables integration tests to produce a Kafka message and automatically wait for the correlated response — supporting both correlation ID matching and message key filtering. Built on top of KafkaFlow with a fluent builder API for configuring brokers, consumers, and producers in test setups.</Description>
         <PackageIcon>icon.png</PackageIcon>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>

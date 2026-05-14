@@ -9,7 +9,7 @@
         <AssemblyName>MessageHook.Core</AssemblyName>
         <RootNamespace>MessageHook.Core</RootNamespace>
         <Authors>MessageHook Framework Team</Authors>
-        <Description>Core abstractions for MessageHook — the integration testing framework for Kafka message flows</Description>
+        <Description>Core abstractions for MessageHook. Contains the transport-agnostic interfaces (IConsumer, IProducer), in-memory message pool, filter service for correlation ID and message key matching, and shared models used across the MessageHook framework. Reference this package if you want to build a custom transport adapter.</Description>
         <PackageIcon>icon.png</PackageIcon>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
