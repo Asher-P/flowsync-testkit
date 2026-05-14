@@ -5,7 +5,17 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>MessageHook.Core</PackageId>
+        <AssemblyName>MessageHook.Core</AssemblyName>
+        <RootNamespace>MessageHook.Core</RootNamespace>
+        <Authors>MessageHook Framework Team</Authors>
+        <Description>Core abstractions for MessageHook — the integration testing framework for Kafka message flows</Description>
+        <PackageIcon>icon.png</PackageIcon>
     </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\icon.png" Pack="true" PackagePath="\" />
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
