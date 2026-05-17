@@ -21,7 +21,7 @@ This package provides a robust infrastructure for integration and automation tes
 2. Install the package in your test project:
 
 ```sh
-dotnet add package MessageHook.Orchestration
+dotnet add package MessageHook.Kafka
 ```
 
 ## Configuration
