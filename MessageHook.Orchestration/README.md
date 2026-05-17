@@ -2,13 +2,13 @@
 
 Orchestration layer for **MessageHook** — provides the step factory, configuration, and execution logic for produce-then-consume integration test flows.
 
-> Most users should install **MessageHook.Kafka** instead, which pulls this package automatically and adds the Kafka transport layer.
-
 ## Installation
 
 ```bash
-dotnet add package MessageHook.Orchestration
+dotnet add package MessageHook.Kafka
 ```
+
+> This package (`MessageHook.Orchestration`) is pulled in automatically as a dependency. You only need to reference it directly if you are building a custom transport layer.
 
 ## Key Types
 
